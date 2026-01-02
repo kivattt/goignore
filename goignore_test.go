@@ -399,12 +399,15 @@ func TestMySplit(t *testing.T) {
 
 func TestMaxPathLengthError(t *testing.T) {
 	g := CompileIgnoreLines([]string{""})
-	longPath := strings.Repeat("a/", bufferLengthForPathComponents()+1) // 2 bytes above the path length limit
-	_, err := g.MatchesPath(longPath[:])
-	assert.NotEqual(t, nil, err)
 
-	_, err = g.MatchesPath(longPath[:2047]) // 1 less character
+	// The path length limit
+	longPath := strings.Repeat("a", maxPathLength())
+	_, err := g.MatchesPath(longPath)
 	assert.Equal(t, nil, err)
+
+	// 1 character above the path length limit
+	_, err = g.MatchesPath(longPath + "a")
+	assert.NotEqual(t, nil, err)
 }
 
 func FuzzStringMatch(f *testing.F) {
