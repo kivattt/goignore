@@ -393,7 +393,7 @@ func (g *GitIgnore) matchesPathNoError(path string) bool {
 // Tries to match the path to all the rules in the gitignore
 // Returns an error if the path is longer than 4096 bytes.
 func (g *GitIgnore) MatchesPath(path string) (bool, error) {
-	// Guard against out-of-bounds in mySplitBuf()
+	// Guard against out-of-bounds panic in mySplitBuf()
 	if len(path) > maxPathLength() {
 		return false, errors.New("path cannot be longer than " + strconv.Itoa(maxPathLength()) + " bytes")
 	}
