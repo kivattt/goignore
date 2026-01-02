@@ -385,7 +385,7 @@ func TestMySplitBuf(t *testing.T) {
 
 func TestMaxPathLengthError(t *testing.T) {
 	g := CompileIgnoreLines([]string{""})
-	longPath := strings.Repeat("a/", bufferLengthForPathComponents() + 1) // 2 bytes above the path length limit
+	longPath := strings.Repeat("a/", bufferLengthForPathComponents()+1) // 2 bytes above the path length limit
 	_, err := g.MatchesPath(longPath[:])
 	assert.NotEqual(t, nil, err)
 
