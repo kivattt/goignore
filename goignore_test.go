@@ -360,11 +360,20 @@ func TestFolders(t *testing.T) {
 	assert.Equal(t, false, ignoreObject.matchesPathNoError("Fizz/Folder"), "should not match Fizz/Folder")
 }
 
-func TestMySplitBuf(t *testing.T) {
+// Test for both mySplit() and mySplitBuf()
+func TestMySplit(t *testing.T) {
 	type TestCase struct {
 		str       string
 		separator byte
 		expected  []string
+	}
+
+	repeatSlice := func(s string, numTimes int) []string {
+		out := make([]string, numTimes)
+		for i := range out {
+			out[i] = s
+		}
+		return out
 	}
 
 	tests := []TestCase{
@@ -372,6 +381,8 @@ func TestMySplitBuf(t *testing.T) {
 		{"dontsplit", ' ', []string{"dontsplit"}},
 		{"", ' ', []string{}},
 		{"aaaaa", 'a', []string{}},
+		// Make sure we don't crash when splitting the max amount of path components in mySplitBuf()
+		{strings.Repeat("a/", bufferLengthForPathComponents()), '/', repeatSlice("a", bufferLengthForPathComponents())},
 	}
 
 	// mySplitBuf expects a buffer slice of sufficient length.
@@ -379,6 +390,9 @@ func TestMySplitBuf(t *testing.T) {
 
 	for _, test := range tests {
 		result := mySplitBuf(test.str, test.separator, buffer)
+		assert.Equal(t, test.expected, result)
+
+		result = mySplit(test.str, test.separator)
 		assert.Equal(t, test.expected, result)
 	}
 }
