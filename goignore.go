@@ -14,6 +14,8 @@ func bufferLengthForPathComponents() int {
 }
 
 func maxPathLength() int {
+	// You need atleast 1 character between each separator character for mySplitBuf() to use up a path component
+	// e.g. "a/a/a/a/a/..."
 	return 2 * bufferLengthForPathComponents()
 }
 
