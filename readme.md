@@ -14,24 +14,22 @@ go get github.com/botondmester/goignore
 
 This is a simple example showing how to use the library:
 ```go
-import (
-    "fmt"
-    "os"
-    "strings"
+package main
 
-    "github.com/botondmester/goignore"
-)
+import "github.com/botondmester/goignore"
 
 func main() {
     ignore := goignore.CompileIgnoreLines([]string{
-		"/*",
-		"!/foo",
-		"/foo/*",
-		"!/foo/bar",
-	})
+        "/*",
+        "!/foo",
+        "/foo/*",
+        "!/foo/bar",
+    })
 
     // should print `foo/baz is ignored`
-    if ignore.MatchesPath("foo/baz") {
+    isIgnored, _ := ignore.MatchesPath("foo/baz")
+
+    if isIgnored {
         println("foo/baz is ignored")
     } else {
         println("foo/baz is not ignored")
