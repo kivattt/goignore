@@ -406,9 +406,6 @@ func (g *GitIgnore) MatchesPath(path string) (bool, error) {
 		path = "/"
 		isDir = true
 	}
-	if path == "*" {
-		return false, nil
-	}
 	if !fs.ValidPath(path) {
 		return false, nil
 	}
