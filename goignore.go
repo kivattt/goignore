@@ -409,7 +409,7 @@ func (g *GitIgnore) MatchesPath(path string) (bool, error) {
 	if !fs.ValidPath(path) {
 		return false, nil
 	}
-	pathComponents := mySplitBuf(path, '/', g.pathComponentsBuf)
+	pathComponents := mySplit(path, '/')
 	matched := false
 
 	for _, rule := range g.Rules {
