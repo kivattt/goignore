@@ -37,7 +37,7 @@ SOFTWARE.
 */
 
 func ExampleCompileIgnoreLines() {
-	ignoreObject := CompileIgnoreLines([]string{"node_modules", "*.out", "foo/*.c"})
+	ignoreObject := CompileIgnoreLines("node_modules", "*.out", "foo/*.c")
 
 	// You can test the ignoreObject against various paths using the
 	// "Match()" interface method. This pretty much is up to
@@ -77,12 +77,12 @@ func ExampleCompileIgnoreFile() {
 
 // Validate the correct handling of the negation operator "!"
 func TestCompileIgnoreLines_HandleIncludePattern(t *testing.T) {
-	ignoreObject := CompileIgnoreLines([]string{
+	ignoreObject := CompileIgnoreLines(
 		"/*",
 		"!/foo",
 		"/foo/*",
 		"!/foo/bar",
-	})
+	)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -94,11 +94,11 @@ func TestCompileIgnoreLines_HandleIncludePattern(t *testing.T) {
 
 // Validate the correct handling of leading / chars
 func TestCompileIgnoreLines_HandleLeadingSlash(t *testing.T) {
-	ignoreObject := CompileIgnoreLines([]string{
+	ignoreObject := CompileIgnoreLines(
 		"/a/b/c",
 		"d/e/f",
 		"/g",
-	})
+	)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -110,12 +110,12 @@ func TestCompileIgnoreLines_HandleLeadingSlash(t *testing.T) {
 
 // Validate the correct handling of files starting with # or !
 func TestCompileIgnoreLines_HandleLeadingSpecialChars(t *testing.T) {
-	ignoreObject := CompileIgnoreLines([]string{
+	ignoreObject := CompileIgnoreLines(
 		"# Comment",
 		"\\#file.txt",
 		"\\!file.txt",
 		"file.txt",
-	})
+	)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -130,7 +130,7 @@ func TestCompileIgnoreLines_HandleLeadingSpecialChars(t *testing.T) {
 
 // Validate the correct handling matching files only within a given folder
 func TestCompileIgnoreLines_HandleAllFilesInDir(t *testing.T) {
-	ignoreObject := CompileIgnoreLines([]string{"Documentation/*.html"})
+	ignoreObject := CompileIgnoreLines("Documentation/*.html")
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -141,7 +141,7 @@ func TestCompileIgnoreLines_HandleAllFilesInDir(t *testing.T) {
 
 // Validate the correct handling of "**"
 func TestCompileIgnoreLines_HandleDoubleStar(t *testing.T) {
-	ignoreObject := CompileIgnoreLines([]string{"**/foo", "bar", "baz/**"})
+	ignoreObject := CompileIgnoreLines("**/foo", "bar", "baz/**")
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -154,7 +154,7 @@ func TestCompileIgnoreLines_HandleDoubleStar(t *testing.T) {
 
 // Validate the correct handling of leading slash
 func TestCompileIgnoreLines_HandleLeadingSlashPath(t *testing.T) {
-	object := CompileIgnoreLines([]string{"/*.c"})
+	object := CompileIgnoreLines("/*.c")
 
 	assert.NotNil(t, object, "Returned object should not be nil")
 
@@ -173,7 +173,7 @@ func TestCompileIgnoreLines_CheckNestedDotFiles(t *testing.T) {
 		"**/external/barfoo/less",
 		"**/external/barfoo/scss",
 	}
-	ignoreObject := CompileIgnoreLines(lines)
+	ignoreObject := CompileIgnoreLines(lines...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -184,7 +184,7 @@ func TestCompileIgnoreLines_CheckNestedDotFiles(t *testing.T) {
 
 func TestCompileIgnoreLines_CarriageReturn(t *testing.T) {
 	lines := []string{"abc/def\r", "a/b/c\r", "b\r"}
-	ignoreObject := CompileIgnoreLines(lines)
+	ignoreObject := CompileIgnoreLines(lines...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -201,7 +201,7 @@ func TestCompileIgnoreLines_WindowsPath(t *testing.T) {
 		return
 	}
 	lines := []string{"abc/def", "a/b/c", "b"}
-	ignoreObject := CompileIgnoreLines(lines)
+	ignoreObject := CompileIgnoreLines(lines...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -211,7 +211,7 @@ func TestCompileIgnoreLines_WindowsPath(t *testing.T) {
 
 func TestWildCardFiles(t *testing.T) {
 	gitIgnore := []string{"*.swp", "/foo/*.wat", "bar/*.txt"}
-	ignoreObject := CompileIgnoreLines(gitIgnore)
+	ignoreObject := CompileIgnoreLines(gitIgnore...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -232,7 +232,7 @@ func TestWildCardFiles(t *testing.T) {
 
 func TestPrecedingSlash(t *testing.T) {
 	gitIgnore := []string{"/foo", "bar/"}
-	ignoreObject := CompileIgnoreLines(gitIgnore)
+	ignoreObject := CompileIgnoreLines(gitIgnore...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -248,7 +248,7 @@ func TestPrecedingSlash(t *testing.T) {
 
 func TestDirOnlyMatching(t *testing.T) {
 	gitIgnore := []string{"foo/", "bar/"}
-	ignoreObject := CompileIgnoreLines(gitIgnore)
+	ignoreObject := CompileIgnoreLines(gitIgnore...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -262,7 +262,7 @@ func TestDirOnlyMatching(t *testing.T) {
 
 func TestCharacterClasses(t *testing.T) {
 	gitIgnore := []string{"[a-zA-Z*!]-files"}
-	ignoreObject := CompileIgnoreLines(gitIgnore)
+	ignoreObject := CompileIgnoreLines(gitIgnore...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -274,7 +274,7 @@ func TestCharacterClasses(t *testing.T) {
 	assert.Equal(t, false, ignoreObject.matchesPathNoError("8-files"), "should not match 8-files")
 
 	gitIgnore = []string{"[!a-zA-Z*!]-files"}
-	ignoreObject = CompileIgnoreLines(gitIgnore)
+	ignoreObject = CompileIgnoreLines(gitIgnore...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -286,7 +286,7 @@ func TestCharacterClasses(t *testing.T) {
 	assert.Equal(t, true, ignoreObject.matchesPathNoError("8-files"), "should match 8-files")
 
 	gitIgnore = []string{"[]-]"}
-	ignoreObject = CompileIgnoreLines(gitIgnore)
+	ignoreObject = CompileIgnoreLines(gitIgnore...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -296,7 +296,7 @@ func TestCharacterClasses(t *testing.T) {
 	assert.Equal(t, false, ignoreObject.matchesPathNoError("[]-]"), "should not match -]")
 
 	gitIgnore = []string{"[[:digit:]].txt", "[:alpha:].txt"}
-	ignoreObject = CompileIgnoreLines(gitIgnore)
+	ignoreObject = CompileIgnoreLines(gitIgnore...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
@@ -307,7 +307,7 @@ func TestCharacterClasses(t *testing.T) {
 
 func TestUnclosedCharacterClass(t *testing.T) {
 	gitIgnore := []string{"*[*"}
-	ignoreObject := CompileIgnoreLines(gitIgnore)
+	ignoreObject := CompileIgnoreLines(gitIgnore...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 	assert.Equal(t, false, ignoreObject.matchesPathNoError("["), "should not match [")
@@ -316,7 +316,7 @@ func TestUnclosedCharacterClass(t *testing.T) {
 	assert.Equal(t, false, ignoreObject.matchesPathNoError("*[*"), "should not match *[*")
 
 	gitIgnore = []string{"[a-z][[]A-Z*-files"}
-	ignoreObject = CompileIgnoreLines(gitIgnore)
+	ignoreObject = CompileIgnoreLines(gitIgnore...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 	assert.Equal(t, true, ignoreObject.matchesPathNoError("a[A-Z-files"), "should match a[A-Z-files")
@@ -324,7 +324,7 @@ func TestUnclosedCharacterClass(t *testing.T) {
 
 func TestStarExponentialBehaviour(t *testing.T) {
 	gitIgnore := []string{"*a*a*a*a*a*a*a*a*a*a*a*a"}
-	ignoreObject := CompileIgnoreLines(gitIgnore)
+	ignoreObject := CompileIgnoreLines(gitIgnore...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 	assert.Equal(t, false, ignoreObject.matchesPathNoError("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab"), "should not match")
@@ -332,7 +332,7 @@ func TestStarExponentialBehaviour(t *testing.T) {
 
 func TestStarStarExponentialBehaviour(t *testing.T) {
 	gitIgnore := []string{"**/a/**/a/**/a/**/a/**/a/**/a/**/a/**/a/**/a/**/a"}
-	ignoreObject := CompileIgnoreLines(gitIgnore)
+	ignoreObject := CompileIgnoreLines(gitIgnore...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 	assert.Equal(t, true, ignoreObject.matchesPathNoError("a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/a/b"), "should match")
@@ -340,7 +340,7 @@ func TestStarStarExponentialBehaviour(t *testing.T) {
 
 func TestStarFilepath(t *testing.T) {
 	gitIgnore := []string{"\\*"}
-	ignoreObject := CompileIgnoreLines(gitIgnore)
+	ignoreObject := CompileIgnoreLines(gitIgnore...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 	assert.Equal(t, true, ignoreObject.matchesPathNoError("*"), "should match")
@@ -348,7 +348,7 @@ func TestStarFilepath(t *testing.T) {
 
 func TestEscaping(t *testing.T) {
 	gitIgnore := []string{"\\[hello", "bye[\\]"}
-	ignoreObject := CompileIgnoreLines(gitIgnore)
+	ignoreObject := CompileIgnoreLines(gitIgnore...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 	assert.Equal(t, true, ignoreObject.matchesPathNoError("[hello"), "should match [hello")
@@ -359,7 +359,7 @@ func TestEscaping(t *testing.T) {
 
 func TestFolders(t *testing.T) {
 	gitIgnore := []string{"Folder/"}
-	ignoreObject := CompileIgnoreLines(gitIgnore)
+	ignoreObject := CompileIgnoreLines(gitIgnore...)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 	assert.Equal(t, true, ignoreObject.matchesPathNoError("Folder/Folder"), "should match Folder/Folder")
@@ -405,7 +405,7 @@ func FuzzWhole(f *testing.F) {
 	f.Add("hell*[oasd], [[:alpha:]]orld!", "hello, world!")
 	f.Add("hell*[!asd], [![:digit:]]orld!", "hello, world!")
 	f.Fuzz(func(t *testing.T, ignore string, path string) {
-		ignoreObject := CompileIgnoreLines(strings.Split(ignore, "/n"))
+		ignoreObject := CompileIgnoreLines(strings.Split(ignore, "/n")...)
 
 		if ignoreObject == nil {
 			t.Fail()
