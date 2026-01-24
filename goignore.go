@@ -9,37 +9,6 @@ import (
 )
 
 // this is my own implementation of strings.Split()
-// for my use case, this is way faster than the stdlib one
-// the function expects a slice of sufficient length to get passed to it,
-// this avoids unnecessary memory allocation
-func mySplitBuf(s string, sep byte, pathComponentsBuf []string) []string {
-	idx := 0
-	l := 0
-	for {
-		pos := strings.IndexByte(s[l:], sep)
-
-		if pos == -1 {
-			break
-		}
-
-		absolutePos := l + pos
-		if absolutePos > l {
-			pathComponentsBuf[idx] = s[l:absolutePos]
-			idx++
-		}
-		l = absolutePos + 1
-	}
-	// handle the last part separately
-	if l < len(s) {
-		pathComponentsBuf[idx] = s[l:]
-		idx++
-	}
-
-	// truncate the slice to the actual number of components
-	return pathComponentsBuf[:idx]
-}
-
-// this is my own implementation of strings.Split()
 // for my use case, this is better than the stdlib one
 func mySplit(s string, sep byte) []string {
 	l := 0
