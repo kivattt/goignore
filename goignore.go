@@ -1,6 +1,7 @@
 package goignore
 
 import (
+	"bytes"
 	"errors"
 	"io/fs"
 	"os"
@@ -323,12 +324,11 @@ func stringMatch(str string, component ruleComponent) bool {
 					continue
 				}
 			case raw:
-				pattern := string(instruction.Data)
-				if i+len(pattern) > len(str) {
+				if i+len(instruction.Data) > len(str) {
 					break
 				}
-				if str[i:i+len(pattern)] == pattern {
-					i += len(pattern)
+				if bytes.Compare([]byte(str[i:i+len(instruction.Data)]), instruction.Data) == 0 {
+					i += len(instruction.Data)
 					j++
 					continue
 				}
