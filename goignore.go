@@ -318,7 +318,7 @@ func matchComponent(str string, component ruleComponent) bool {
 				}
 			case raw:
 				patLen := len(instruction.Pattern)
-				if i+patLen != strLen {
+				if i+patLen > strLen {
 					break
 				}
 				if str[i] != instruction.Pattern[0] {
