@@ -377,7 +377,7 @@ type GitIgnore struct {
 }
 
 // Creates a Gitignore from a list of patterns (lines in a .gitignore file)
-func CompileIgnoreLines(patterns []string) *GitIgnore {
+func CompileIgnoreLines(patterns ...string) *GitIgnore {
 	gitignore := &GitIgnore{
 		rules: make([]rule, 0, len(patterns)),
 	}
@@ -404,7 +404,7 @@ func CompileIgnoreFile(filename string) (*GitIgnore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return CompileIgnoreLines(strings.Split(string(lines), "\n")), nil
+	return CompileIgnoreLines(strings.Split(string(lines), "\n")...), nil
 }
 
 // create a rule from a pattern
