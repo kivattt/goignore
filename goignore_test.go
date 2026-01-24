@@ -40,7 +40,7 @@ func ExampleCompileIgnoreLines() {
 	ignoreObject := CompileIgnoreLines("node_modules", "*.out", "foo/*.c")
 
 	// You can test the ignoreObject against various paths using the
-	// "Match()" interface method. This pretty much is up to
+	// "MatchesPath()" interface method. This pretty much is up to
 	// the users interpretation. In the case of a ".gitignore" file,
 	// a "match" would indicate that a given path would be ignored.
 	fmt.Println(ignoreObject.MatchesPath("node_modules/test/foo.js"))
@@ -63,7 +63,7 @@ func ExampleCompileIgnoreFile() {
 	}
 
 	// You can test the ignoreObject against various paths using the
-	// "Match()" interface method.
+	// "MatchesPath()" interface method.
 	// int this example, we test paths against the .gitignore file of this package.
 	fmt.Println(ignoreObject.MatchesPath("bin/goignore.so"))
 	fmt.Println(ignoreObject.MatchesPath("goignore.test"))

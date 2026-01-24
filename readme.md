@@ -19,17 +19,15 @@ package main
 import "github.com/botondmester/goignore"
 
 func main() {
-    ignore := goignore.CompileIgnoreLines([]string{
+    ignore := goignore.CompileIgnoreLines(
         "/*",
         "!/foo",
         "/foo/*",
         "!/foo/bar",
-    })
+    )
 
     // should print `foo/baz is ignored`
-    isIgnored, _ := ignore.MatchesPath("foo/baz")
-
-    if isIgnored {
+    if ignore.MatchesPath("foo/baz") {
         println("foo/baz is ignored")
     } else {
         println("foo/baz is not ignored")
