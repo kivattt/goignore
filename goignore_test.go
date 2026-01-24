@@ -422,7 +422,11 @@ func FuzzStringMatch(f *testing.F) {
 	f.Add("hello, world!", "hell*[oasd], [[:alpha:]]orld!")
 	f.Add("hello, world!", "hell*[!asd], [![:digit:]]orld!")
 	f.Fuzz(func(t *testing.T, str string, pattern string) {
-		stringMatch(str, pattern)
+		comp, err := makeRuleComponent(pattern)
+		if err != nil {
+			return
+		}
+		stringMatch(str, comp)
 	})
 }
 

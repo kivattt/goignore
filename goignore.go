@@ -77,13 +77,34 @@ func mySplit(s string, sep byte) []string {
 	return buf
 }
 
+type ruleInstructionType byte
+
+const (
+	raw ruleInstructionType = iota
+	star
+	starStar
+	questionmark
+	charClass
+)
+
+type ruleInstruction struct {
+	Type ruleInstructionType
+	Data []byte
+}
+
+type ruleComponent struct {
+	Instructions []ruleInstruction
+	Starstar     bool
+	Star         bool
+}
+
 // Represents a single rule in a .gitignore file
 // Components is a list of path components to match against
 // Negate is true if the rule negates the match (i.e. starts with '!')
 // OnlyDirectory is true if the rule matches only directories (i.e. ends with '/')
 // Relative is true if the rule is relative (i.e. starts with '/')
-type Rule struct {
-	Components    []string
+type rule struct {
+	Components    []ruleComponent
 	Negate        bool
 	OnlyDirectory bool
 	Relative      bool
@@ -120,124 +141,194 @@ func selectorMatch(c byte, selector string) bool {
 	}
 }
 
-func stringMatch(str string, pattern string) bool {
+func makeRuleComponent(component string) (ruleComponent, error) {
+	instructions := make([]ruleInstruction, 0, 8)
+	r := 0
+
+	if component == "*" {
+		instructions = append(instructions, ruleInstruction{
+			Type: star,
+		})
+		return ruleComponent{
+			Instructions: instructions,
+			Starstar:     false,
+			Star:         true,
+		}, nil
+	}
+	if component == "**" {
+		instructions = append(instructions, ruleInstruction{
+			Type: starStar,
+		})
+		return ruleComponent{
+			Instructions: instructions,
+			Starstar:     true,
+			Star:         false,
+		}, nil
+	}
+
+	for r < len(component) {
+		switch component[r] {
+		case '*':
+			r++
+			instructions = append(instructions, ruleInstruction{
+				Type: star,
+			})
+			continue
+		case '?':
+			r++
+			instructions = append(instructions, ruleInstruction{
+				Type: questionmark,
+			})
+			continue
+		case '[':
+			r++
+			charC := ruleInstruction{
+				Type: charClass,
+				Data: make([]byte, 256), // maybe get the size of byte instead? It really doesn't matter
+			}
+
+			if r >= len(component) {
+				return ruleComponent{}, errors.New("unclosed character class")
+			}
+
+			negate := false
+
+			if component[r] == '!' || component[r] == '^' {
+				negate = true
+				r++
+				if r >= len(component) {
+					return ruleComponent{}, errors.New("unclosed character class")
+				}
+			}
+
+			// special-case leading ']'
+			if component[r] == ']' {
+				charC.Data[']'] = 1
+				r++
+			}
+
+			for r < len(component) && component[r] != ']' {
+				// handle escaping
+				if component[r] == '\\' && r+1 < len(component) {
+					r += 2
+					continue
+				}
+				// handle special [:class:] character classes
+				if r+2 < len(component) && component[r] == '[' && component[r+1] == ':' {
+					r += 2
+					s := r
+					for s < len(component) && (component[s] != ']' || component[s-1] != ':') {
+						s++
+					}
+
+					if s >= len(component) || s < r+2 {
+						return ruleComponent{}, errors.New("unclosed character class")
+					}
+
+					selector := component[r : s-1]
+
+					for i := 0; i < 256; i++ {
+						if selectorMatch(byte(i), selector) {
+							charC.Data[i] = 1
+						}
+					}
+
+					r = s + 1
+					continue
+				}
+				// handle ranges
+				if r+2 < len(component) && component[r+1] == '-' && component[r+2] != ']' {
+					a := component[r]
+					b := component[r+2]
+					if a <= b {
+						for i := a; i < b; i++ {
+							charC.Data[i] = 1
+						}
+						charC.Data[b] = 1
+					}
+					r += 3
+					continue
+				}
+				// add to LUT
+				charC.Data[component[r]] = 1
+				r++
+			}
+
+			if r >= len(component) || component[r] != ']' {
+				return ruleComponent{}, errors.New("unclosed character class")
+			}
+
+			r++ // skip closing ']'
+
+			if negate {
+				for i := 0; i < len(charC.Data); i++ {
+					charC.Data[i] = 1 - charC.Data[i]
+				}
+			}
+
+			instructions = append(instructions, charC)
+			continue
+		}
+
+		rawPattern := make([]byte, 0, 16)
+
+		for r < len(component) && component[r] != '*' && component[r] != '?' && component[r] != '[' {
+			if component[r] == '\\' && r+1 < len(component) {
+				rawPattern = append(rawPattern, component[r+1])
+				r += 2
+				continue
+			}
+			rawPattern = append(rawPattern, component[r])
+			r++
+		}
+
+		instructions = append(instructions, ruleInstruction{
+			Type: raw,
+			Data: rawPattern,
+		})
+	}
+
+	return ruleComponent{
+		Instructions: instructions,
+		Starstar:     false,
+		Star:         false,
+	}, nil
+}
+
+func stringMatch(str string, component ruleComponent) bool {
 	// i is the index in str, j is the index in pattern
 	i, j := 0, 0
 	lastStarIdx := -1
 	lastStrIdx := -1
 
-	matchCharClass := func(j int, ch byte) (match bool, newJ int, ok bool) {
-		j++ // skip '['
-		if j >= len(pattern) {
-			return false, j, false
-		}
-		negate := false
-		matched := false
-		if pattern[j] == '!' || pattern[j] == '^' {
-			negate = true
-			j++
-			if j >= len(pattern) {
-				return false, j, false
-			}
-		}
-
-		// special-case leading ']'
-		if pattern[j] == ']' {
-			if ch == ']' {
-				matched = true
-			}
-			j++
-		}
-
-		for j < len(pattern) && pattern[j] != ']' {
-			// handle escaping
-			if pattern[j] == '\\' && j+1 < len(pattern) {
-				j += 2
-				continue
-			}
-			// handle special [:class:] character classes
-			if j+2 < len(pattern) && pattern[j] == '[' && pattern[j+1] == ':' {
-				j += 2
-				s := j
-				for s < len(pattern) && (pattern[s] != ']' || pattern[s-1] != ':') {
-					s++
-				}
-
-				// unclosed character class
-				if s >= len(pattern) || s < j+2 {
-					return false, j, false
-				}
-
-				selector := pattern[j : s-1]
-				if selectorMatch(ch, selector) {
-					matched = true
-				}
-				j = s + 1
-				continue
-			}
-			// handle ranges
-			if j+2 < len(pattern) && pattern[j+1] == '-' && pattern[j+2] != ']' {
-				a := pattern[j]
-				b := pattern[j+2]
-				if a <= ch && ch <= b {
-					matched = true
-				}
-				j += 3
-				continue
-			}
-			if pattern[j] == ch {
-				matched = true
-			}
-			j++
-		}
-
-		if j >= len(pattern) || pattern[j] != ']' {
-			// unclosed character class
-			return false, j, false
-		}
-
-		j++ // skip closing ']'
-		if negate {
-			return !matched, j, true
-		}
-		return matched, j, true
-	}
-
 	for i < len(str) {
-		if j < len(pattern) {
-			pChar := pattern[j]
-			if pChar == '?' {
+		if j < len(component.Instructions) {
+			instruction := component.Instructions[j]
+			switch instruction.Type {
+			case questionmark:
 				i++
 				j++
 				continue
-			}
-			if pChar == '*' {
-				// record star position and advance pattern
+			case star:
 				lastStarIdx = j
 				lastStrIdx = i
 				j++
 				continue
-			}
-			if pChar == '[' {
-				okMatch, newJ, ok := matchCharClass(j, str[i])
-				if !ok {
-					// unclosed class -> no match
-					return false
-				}
-				if okMatch {
+			case starStar:
+				return true
+			case charClass:
+				if instruction.Data[str[i]] == 1 {
 					i++
-					j = newJ
+					j++
 					continue
 				}
-				// class did not match, go to star-backtrack logic
-			} else {
-				// handle escaping
-				if pChar == '\\' && j+1 < len(pattern) {
-					j++
-					pChar = pattern[j]
+			case raw:
+				pattern := string(instruction.Data)
+				if i+len(pattern) > len(str) {
+					break
 				}
-				if str[i] == pChar {
-					i++
+				if str[i:i+len(pattern)] == pattern {
+					i += len(pattern)
 					j++
 					continue
 				}
@@ -255,26 +346,26 @@ func stringMatch(str string, pattern string) bool {
 		return false
 	}
 
-	// consume remaining stars in pattern
-	for j < len(pattern) && pattern[j] == '*' {
+	// consume remaining stars in component
+	for j < len(component.Instructions) && component.Instructions[j].Type == star {
 		j++
 	}
 
-	// if we ran out of pattern, return true
-	return j >= len(pattern)
+	// if we ran out of instructions, return true
+	return j >= len(component.Instructions)
 }
 
 // Tries to match the path components against the rule components
 // matches is true if the path matches the rule, final is true if the rule matched the whole path
 // the final parameter is used for rules that match directories only
-func matchComponents(path []string, components []string) (matches bool, final bool) {
+func matchComponents(path []string, components []ruleComponent) (matches bool, final bool) {
 	i := 0
 	for ; i < len(components); i++ {
 		if i >= len(path) {
 			// we ran out of path components, but still have components to match
 			return false, false
 		}
-		if components[i] == "**" {
+		if components[i].Starstar {
 			// stinky recursive step
 			for j := len(path) - 1; j >= i; j-- {
 				match, final := matchComponents(path[j:], components[i+1:])
@@ -295,7 +386,7 @@ func matchComponents(path []string, components []string) (matches bool, final bo
 
 // Tries to match the path against the rule
 // the function expects a buffer of sufficient size to get passed to it, this avoids excessive memory allocation
-func (r *Rule) matchesPath(isDirectory bool, pathComponents []string) bool {
+func (r *rule) matchesPath(isDirectory bool, pathComponents []string) bool {
 	if !r.Relative {
 		// stinky recursive step
 		for j := 0; j < len(pathComponents); j++ {
@@ -316,14 +407,14 @@ func (r *Rule) matchesPath(isDirectory bool, pathComponents []string) bool {
 // Stores a list of rules for matching paths against .gitignore patterns
 // PathComponentsBuf is a temporary buffer for mySplit calls, this avoids excessive allocation
 type GitIgnore struct {
-	Rules             []Rule
+	rules             []rule
 	pathComponentsBuf []string
 }
 
 // Creates a Gitignore from a list of patterns (lines in a .gitignore file)
 func CompileIgnoreLines(patterns []string) *GitIgnore {
 	gitignore := &GitIgnore{
-		Rules:             make([]Rule, 0, len(patterns)),
+		rules:             make([]rule, 0, len(patterns)),
 		pathComponentsBuf: make([]string, bufferLengthForPathComponents()),
 	}
 
@@ -336,7 +427,7 @@ func CompileIgnoreLines(patterns []string) *GitIgnore {
 
 		rule := createRule(pattern)
 
-		gitignore.Rules = append(gitignore.Rules, rule)
+		gitignore.rules = append(gitignore.rules, rule)
 	}
 
 	return gitignore
@@ -353,7 +444,7 @@ func CompileIgnoreFile(filename string) (*GitIgnore, error) {
 }
 
 // create a rule from a pattern
-func createRule(pattern string) Rule {
+func createRule(pattern string) rule {
 	negate := false
 	onlyDirectory := false
 	relative := false
@@ -377,8 +468,17 @@ func createRule(pattern string) Rule {
 	// this saves memory compared to using mySplit
 	components := mySplit(pattern, '/')
 
-	return Rule{
-		Components:    components,
+	ruleComponents := make([]ruleComponent, len(components))
+
+	for i := 0; i < len(components); i++ {
+		comp, err := makeRuleComponent(components[i])
+		if err == nil {
+			ruleComponents[i] = comp
+		}
+	}
+
+	return rule{
+		Components:    ruleComponents,
 		Negate:        negate,
 		OnlyDirectory: onlyDirectory,
 		Relative:      relative || len(components) > 1,
@@ -412,7 +512,7 @@ func (g *GitIgnore) MatchesPath(path string) (bool, error) {
 	pathComponents := mySplit(path, '/')
 	matched := false
 
-	for _, rule := range g.Rules {
+	for _, rule := range g.rules {
 		if rule.matchesPath(isDir, pathComponents) {
 			if !rule.Negate {
 				matched = true
