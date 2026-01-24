@@ -449,14 +449,8 @@ func createRule(pattern string) rule {
 	}
 }
 
-func (g *GitIgnore) matchesPathNoError(path string) bool {
-	result, _ := g.MatchesPath(path)
-	return result
-}
-
 // Tries to match the path to all the rules in the gitignore
-// Returns an error if the path is longer than 4096 bytes.
-func (g *GitIgnore) MatchesPath(path string) (bool, error) {
+func (g *GitIgnore) MatchesPath(path string) bool {
 	// TODO: check if path actually points to a directory on the filesystem
 	isDir := strings.HasSuffix(path, "/")
 	path = filepath.Clean(path)
@@ -466,7 +460,7 @@ func (g *GitIgnore) MatchesPath(path string) (bool, error) {
 		isDir = true
 	}
 	if !fs.ValidPath(path) {
-		return false, nil
+		return false
 	}
 	pathComponents := mySplit(path, '/')
 	matched := false
@@ -480,5 +474,5 @@ func (g *GitIgnore) MatchesPath(path string) (bool, error) {
 			}
 		}
 	}
-	return matched, nil
+	return matched
 }
