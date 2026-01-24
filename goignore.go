@@ -76,11 +76,13 @@ const (
 	charClass
 )
 
+// Represents a single instruction in a rule component
 type ruleInstruction struct {
 	Type    ruleInstructionType
 	Pattern string
 }
 
+// Represents a single component of a rule (a rule is a series of components separated by '/')
 type ruleComponent struct {
 	Instructions []ruleInstruction
 	Starstar     bool
@@ -284,7 +286,7 @@ func makeRuleComponent(component string) (ruleComponent, error) {
 	}, nil
 }
 
-func stringMatch(str string, component ruleComponent) bool {
+func matchComponent(str string, component ruleComponent) bool {
 	// i is the index in str, j is the index in pattern
 	i, j := 0, 0
 	lastStarIdx := -1
@@ -353,7 +355,7 @@ func stringMatch(str string, component ruleComponent) bool {
 // Tries to match the path components against the rule components
 // matches is true if the path matches the rule, final is true if the rule matched the whole path
 // the final parameter is used for rules that match directories only
-func matchComponents(path []string, components []ruleComponent) (matches bool, final bool) {
+func matchAllComponents(path []string, components []ruleComponent) (matches bool, final bool) {
 	i := 0
 	for ; i < len(components); i++ {
 		if i >= len(path) {
@@ -363,7 +365,7 @@ func matchComponents(path []string, components []ruleComponent) (matches bool, f
 		if components[i].Starstar {
 			// stinky recursive step
 			for j := len(path) - 1; j >= i; j-- {
-				match, final := matchComponents(path[j:], components[i+1:])
+				match, final := matchAllComponents(path[j:], components[i+1:])
 				if match {
 					// pass final trough
 					return true, final
@@ -372,7 +374,7 @@ func matchComponents(path []string, components []ruleComponent) (matches bool, f
 			return false, false
 		}
 
-		if !stringMatch(path[i], components[i]) {
+		if !matchComponent(path[i], components[i]) {
 			return false, false
 		}
 	}
@@ -385,7 +387,7 @@ func (r *rule) matchesPath(isDirectory bool, pathComponents []string) bool {
 	if !r.Relative {
 		// stinky recursive step
 		for j := 0; j < len(pathComponents); j++ {
-			match, final := matchComponents(pathComponents[j:], r.Components)
+			match, final := matchAllComponents(pathComponents[j:], r.Components)
 			if match {
 				return !r.OnlyDirectory || r.OnlyDirectory && (!final || final && isDirectory)
 			}
@@ -394,7 +396,7 @@ func (r *rule) matchesPath(isDirectory bool, pathComponents []string) bool {
 		return false
 	}
 
-	match, final := matchComponents(pathComponents, r.Components)
+	match, final := matchAllComponents(pathComponents, r.Components)
 
 	return match && (!r.OnlyDirectory || r.OnlyDirectory && (!final || final && isDirectory))
 }
