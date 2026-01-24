@@ -1,7 +1,6 @@
 package goignore
 
 import (
-	"bytes"
 	"errors"
 	"io/fs"
 	"os"
@@ -89,8 +88,8 @@ const (
 )
 
 type ruleInstruction struct {
-	Type ruleInstructionType
-	Data []byte
+	Type    ruleInstructionType
+	Pattern string
 }
 
 type ruleComponent struct {
@@ -183,10 +182,7 @@ func makeRuleComponent(component string) (ruleComponent, error) {
 			continue
 		case '[':
 			r++
-			charC := ruleInstruction{
-				Type: charClass,
-				Data: make([]byte, 256), // maybe get the size of byte instead? It really doesn't matter
-			}
+			var bitset [32]byte
 
 			if r >= len(component) {
 				return ruleComponent{}, errors.New("unclosed character class")
@@ -204,7 +200,7 @@ func makeRuleComponent(component string) (ruleComponent, error) {
 
 			// special-case leading ']'
 			if component[r] == ']' {
-				charC.Data[']'] = 1
+				bitset[']'/8] |= (1 << (']' % 8))
 				r++
 			}
 
@@ -230,7 +226,7 @@ func makeRuleComponent(component string) (ruleComponent, error) {
 
 					for i := 0; i < 256; i++ {
 						if selectorMatch(byte(i), selector) {
-							charC.Data[i] = 1
+							bitset[i/8] |= (1 << (uint(i) % 8))
 						}
 					}
 
@@ -243,15 +239,15 @@ func makeRuleComponent(component string) (ruleComponent, error) {
 					b := component[r+2]
 					if a <= b {
 						for i := a; i < b; i++ {
-							charC.Data[i] = 1
+							bitset[i/8] |= (1 << (uint(i) % 8))
 						}
-						charC.Data[b] = 1
+						bitset[b/8] |= (1 << (uint(b) % 8))
 					}
 					r += 3
 					continue
 				}
 				// add to LUT
-				charC.Data[component[r]] = 1
+				bitset[component[r]/8] |= (1 << (component[r] % 8))
 				r++
 			}
 
@@ -262,30 +258,33 @@ func makeRuleComponent(component string) (ruleComponent, error) {
 			r++ // skip closing ']'
 
 			if negate {
-				for i := 0; i < len(charC.Data); i++ {
-					charC.Data[i] = 1 - charC.Data[i]
+				for i := 0; i < len(bitset); i++ {
+					bitset[i] = ^bitset[i]
 				}
 			}
 
-			instructions = append(instructions, charC)
+			instructions = append(instructions, ruleInstruction{
+				Type:    charClass,
+				Pattern: string(bitset[:]),
+			})
 			continue
 		}
 
-		rawPattern := make([]byte, 0, 16)
+		patternBuilder := strings.Builder{}
 
 		for r < len(component) && component[r] != '*' && component[r] != '?' && component[r] != '[' {
 			if component[r] == '\\' && r+1 < len(component) {
-				rawPattern = append(rawPattern, component[r+1])
+				patternBuilder.WriteByte(component[r+1])
 				r += 2
 				continue
 			}
-			rawPattern = append(rawPattern, component[r])
+			patternBuilder.WriteByte(component[r])
 			r++
 		}
 
 		instructions = append(instructions, ruleInstruction{
-			Type: raw,
-			Data: rawPattern,
+			Type:    raw,
+			Pattern: patternBuilder.String(),
 		})
 	}
 
@@ -301,9 +300,11 @@ func stringMatch(str string, component ruleComponent) bool {
 	i, j := 0, 0
 	lastStarIdx := -1
 	lastStrIdx := -1
+	strLen := len(str)
+	instrLen := len(component.Instructions)
 
-	for i < len(str) {
-		if j < len(component.Instructions) {
+	for i < strLen {
+		if j < instrLen {
 			instruction := component.Instructions[j]
 			switch instruction.Type {
 			case questionmark:
@@ -318,17 +319,22 @@ func stringMatch(str string, component ruleComponent) bool {
 			case starStar:
 				return true
 			case charClass:
-				if instruction.Data[str[i]] == 1 {
+				char := str[i]
+				if (instruction.Pattern[char/8] & (1 << (char % 8))) != 0 {
 					i++
 					j++
 					continue
 				}
 			case raw:
-				if i+len(instruction.Data) > len(str) {
+				patLen := len(instruction.Pattern)
+				if i+patLen != strLen {
 					break
 				}
-				if bytes.Compare([]byte(str[i:i+len(instruction.Data)]), instruction.Data) == 0 {
-					i += len(instruction.Data)
+				if str[i] != instruction.Pattern[0] {
+					break
+				}
+				if str[i:i+patLen] == instruction.Pattern {
+					i += patLen
 					j++
 					continue
 				}
@@ -347,12 +353,12 @@ func stringMatch(str string, component ruleComponent) bool {
 	}
 
 	// consume remaining stars in component
-	for j < len(component.Instructions) && component.Instructions[j].Type == star {
+	for j < instrLen && component.Instructions[j].Type == star {
 		j++
 	}
 
 	// if we ran out of instructions, return true
-	return j >= len(component.Instructions)
+	return j >= instrLen
 }
 
 // Tries to match the path components against the rule components
