@@ -50,7 +50,7 @@ Currently fuzzing does not check if the library's output is correct.
 
 If you want to, you can do fuzzing using these commands:
 ```shell
-go test -fuzz FuzzStringMatch
+go test -fuzz FuzzMatchComponent
 ```
 or
 ```shell

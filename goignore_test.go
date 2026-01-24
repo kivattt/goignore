@@ -376,49 +376,20 @@ func TestMySplit(t *testing.T) {
 		expected  []string
 	}
 
-	repeatSlice := func(s string, numTimes int) []string {
-		out := make([]string, numTimes)
-		for i := range out {
-			out[i] = s
-		}
-		return out
-	}
-
 	tests := []TestCase{
 		{"this is a test", ' ', []string{"this", "is", "a", "test"}},
 		{"dontsplit", ' ', []string{"dontsplit"}},
 		{"", ' ', []string{}},
 		{"aaaaa", 'a', []string{}},
-		// Make sure we don't crash when splitting the max amount of path components in mySplitBuf()
-		{strings.Repeat("a/", bufferLengthForPathComponents()), '/', repeatSlice("a", bufferLengthForPathComponents())},
 	}
-
-	// mySplitBuf expects a buffer slice of sufficient length.
-	buffer := make([]string, bufferLengthForPathComponents())
 
 	for _, test := range tests {
-		result := mySplitBuf(test.str, test.separator, buffer)
-		assert.Equal(t, test.expected, result)
-
-		result = mySplit(test.str, test.separator)
+		result := mySplit(test.str, test.separator)
 		assert.Equal(t, test.expected, result)
 	}
 }
 
-func TestMaxPathLengthError(t *testing.T) {
-	g := CompileIgnoreLines([]string{""})
-
-	// The path length limit
-	longPath := strings.Repeat("a", maxPathLength())
-	_, err := g.MatchesPath(longPath)
-	assert.Equal(t, nil, err)
-
-	// 1 character above the path length limit
-	_, err = g.MatchesPath(longPath + "a")
-	assert.NotEqual(t, nil, err)
-}
-
-func FuzzStringMatch(f *testing.F) {
+func FuzzMatchComponent(f *testing.F) {
 	f.Add("hello, world!", "hell*[oasd], [[:alpha:]]orld!")
 	f.Add("hello, world!", "hell*[!asd], [![:digit:]]orld!")
 	f.Fuzz(func(t *testing.T, str string, pattern string) {
@@ -426,7 +397,7 @@ func FuzzStringMatch(f *testing.F) {
 		if err != nil {
 			return
 		}
-		stringMatch(str, comp)
+		matchComponent(str, comp)
 	})
 }
 
