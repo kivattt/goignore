@@ -358,7 +358,7 @@ func (r *rule) matchesPath(isDirectory bool, pathComponents []string) bool {
 		for j := 0; j < len(pathComponents); j++ {
 			match, final := matchAllComponents(pathComponents[j:], r.Components)
 			if match {
-				return !r.OnlyDirectory || r.OnlyDirectory && (!final || final && isDirectory)
+				return !final || !r.OnlyDirectory || isDirectory
 			}
 		}
 
@@ -367,7 +367,7 @@ func (r *rule) matchesPath(isDirectory bool, pathComponents []string) bool {
 
 	match, final := matchAllComponents(pathComponents, r.Components)
 
-	return match && (!r.OnlyDirectory || r.OnlyDirectory && (!final || final && isDirectory))
+	return match && (!final || !r.OnlyDirectory || isDirectory)
 }
 
 // Stores a list of rules for matching paths against .gitignore patterns
