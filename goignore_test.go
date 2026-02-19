@@ -496,13 +496,13 @@ func FuzzCorrectness(f *testing.F) {
 		result := ignoreObject.MatchesPath(path)
 
 		if result != expected {
-			fmt.Println("For path:", path)
-			fmt.Println("For .gitignore containing these 3 lines:")
-			fmt.Println("Line #1", line1)
-			fmt.Println("Line #2", line2)
-			fmt.Println("Line #3", line3)
+			t.Log("For path:", path)
+			t.Log("For .gitignore containing these 3 lines:")
+			t.Log("Line #1:", line1)
+			t.Log("Line #2:", line2)
+			t.Log("Line #3:", line3)
 
-			fmt.Println("Expected " + bool2Str(expected) + ", but got: " + bool2Str(result))
+			t.Log("Expected " + bool2Str(expected) + ", but got: " + bool2Str(result))
 			t.Fail()
 		}
 
