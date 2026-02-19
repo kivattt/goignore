@@ -92,6 +92,22 @@ func TestCompileIgnoreLines_HandleIncludePattern(t *testing.T) {
 	assert.Equal(t, false, ignoreObject.MatchesPath("/foo/bar"), "/foo/bar should not match")
 }
 
+func TestCompileIgnoreLines_InvalidReIncludeNegatePattern(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"folder",
+		"!folder/subfolder", // Invalid re-include pattern
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, true, ignoreObject.MatchesPath("folder"), "folder should match")
+	assert.Equal(t, true, ignoreObject.MatchesPath("folder/"), "folder/ should match")
+	assert.Equal(t, true, ignoreObject.MatchesPath("folder/subfolder"), "folder/subfolder should match")
+	assert.Equal(t, true, ignoreObject.MatchesPath("folder/subfolder/"), "folder/subfolder/ should match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("foo"), "foo should not match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("foo/"), "foo/ should not match")
+}
+
 // Validate the correct handling of leading / chars
 func TestCompileIgnoreLines_HandleLeadingSlash(t *testing.T) {
 	ignoreObject := CompileIgnoreLines(

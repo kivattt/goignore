@@ -463,16 +463,33 @@ func (g *GitIgnore) MatchesPath(path string) bool {
 		return false
 	}
 	pathComponents := mySplit(path, '/')
-	matched := false
 
-	for _, rule := range g.rules {
-		if rule.matchesPath(isDir, pathComponents) {
-			if !rule.Negate {
-				matched = true
-			} else {
-				matched = false
+	// First, if there are any parent directories (more than 1 path component), check if they match.
+	for j := 0; j < len(pathComponents) - 1; j++ {
+		for i := len(g.rules)-1; i >= 0; i-- {
+			rule := g.rules[i]
+			if rule.matchesPath(true /* Makes no difference? */, pathComponents[:j+1]) {
+				if rule.Negate {
+					break // Undecided.
+				} else {
+					return true
+				}
 			}
 		}
 	}
-	return matched
+
+	// If no parent directories match, we must check if the whole path matches.
+	for i := len(g.rules)-1; i >= 0; i-- {
+		rule := g.rules[i]
+
+		if rule.matchesPath(isDir, pathComponents) {
+			if rule.Negate {
+				return false
+			} else {
+				return true
+			}
+		}
+	}
+
+	return false
 }
