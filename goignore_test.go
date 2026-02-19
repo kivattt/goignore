@@ -2,6 +2,9 @@ package goignore
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -427,5 +430,86 @@ func FuzzWhole(f *testing.F) {
 			t.Fail()
 		}
 		ignoreObject.MatchesPath(path)
+	})
+}
+
+func FuzzCorrectness(f *testing.F) {
+	// Creates a randomly named folder with a valid repository
+	// And a .gitignore file containing the 3 lines line1, line2 and line3.
+	//
+	// Returns the name of the folder it created.
+	prepareRandomlyNamedRepoWithGitIgnore := func(line1, line2, line3 string) (string, error) {
+		randomName, err := os.MkdirTemp(".", "*-goignore-fuzz")
+		if err != nil {
+			return randomName, err
+		}
+
+		concat := []byte(line1 + "\n" + line2 + "\n" + line3 + "\n")
+
+		// Write the .gitignore
+		os.WriteFile(filepath.Join(randomName, ".gitignore"), concat, 0644)
+
+		// "git init" the repo
+		cmd := exec.Command("git", "init")
+		cmd.Dir = randomName
+		err = cmd.Run()
+		return randomName, err
+	}
+
+	deleteFolderRecursively := func(path string) error {
+		if !strings.HasSuffix(path, "-goignore-fuzz") {
+			panic("deleteFolderRecursively() was asked to delete a folder not ending in -goignore-fuzz: " + path)
+		}
+
+		return os.RemoveAll(path)
+	}
+
+	gitCheckIgnore := func(repoPath, path string) bool {
+		// git check-ignore --no-index -q <pathname>
+		cmd := exec.Command("git", "check-ignore", "--no-index", "-q", path)
+		cmd.Dir = repoPath
+		err := cmd.Run()
+		return err == nil
+	}
+
+	f.Fuzz(func(t *testing.T, line1, line2, line3 string, path string) {
+		if path == "." {
+			return
+		}
+
+		repoPath, err := prepareRandomlyNamedRepoWithGitIgnore(line1, line2, line3)
+		if err != nil {
+			t.Fail()
+		}
+
+		// We could pass multiple paths to git check-ignore to improve performance?
+		expected := gitCheckIgnore(repoPath, path)
+		bool2Str := func(b bool) string {
+			if b {
+				return "true"
+			}
+			return "false"
+		}
+		fmt.Println("checkignore result:", bool2Str(expected))
+
+		ignoreObject := CompileIgnoreLines(line1, line2, line3)
+		result := ignoreObject.MatchesPath(path)
+
+		if result != expected {
+			fmt.Println("For path:", path)
+			fmt.Println("For .gitignore containing these 3 lines:")
+			fmt.Println("Line #1", line1)
+			fmt.Println("Line #2", line2)
+			fmt.Println("Line #3", line3)
+
+			fmt.Println("Expected " + bool2Str(expected) + ", but got: " + bool2Str(result))
+			t.Fail()
+		}
+
+		err = deleteFolderRecursively(repoPath)
+		if err != nil {
+			fmt.Println("Failed to delete folder:", err)
+			t.Fail()
+		}
 	})
 }
