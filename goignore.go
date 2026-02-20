@@ -376,6 +376,28 @@ type GitIgnore struct {
 	rules []rule
 }
 
+func trimUnescapedTrailingSpaces(s string) string {
+	var i int
+	for i = len(s) - 1; i >= 0; i-- {
+		if s[i] != ' ' {
+			break
+		}
+	}
+
+	// Required to prevent indexing at -1
+	if i < 0 {
+		return ""
+	}
+
+	if s[i] == '\\' {
+		if i < len(s)-1 {
+			i++
+		}
+	}
+
+	return s[:i+1]
+}
+
 // Creates a Gitignore from a list of patterns (lines in a .gitignore file)
 func CompileIgnoreLines(patterns ...string) *GitIgnore {
 	gitignore := &GitIgnore{
@@ -383,8 +405,9 @@ func CompileIgnoreLines(patterns ...string) *GitIgnore {
 	}
 
 	for _, pattern := range patterns {
-		// skip empty lines, comments, and trailing/leading whitespace
-		pattern = strings.Trim(pattern, " \t\r\n")
+		// skip empty lines, comments, and trailing spaces which aren't escaped with a backslash like "\ ".
+		pattern = strings.Trim(pattern, "\r\n")
+		pattern = trimUnescapedTrailingSpaces(pattern)
 		if pattern == "" || pattern == "!" || pattern[0] == '#' {
 			continue
 		}
@@ -465,8 +488,8 @@ func (g *GitIgnore) MatchesPath(path string) bool {
 	pathComponents := mySplit(path, '/')
 
 	// First, if there are any parent directories (more than 1 path component), check if they match.
-	for j := 0; j < len(pathComponents) - 1; j++ {
-		for i := len(g.rules)-1; i >= 0; i-- {
+	for j := 0; j < len(pathComponents)-1; j++ {
+		for i := len(g.rules) - 1; i >= 0; i-- {
 			rule := g.rules[i]
 			if rule.matchesPath(true /* Makes no difference? */, pathComponents[:j+1]) {
 				if rule.Negate {
@@ -479,7 +502,7 @@ func (g *GitIgnore) MatchesPath(path string) bool {
 	}
 
 	// If no parent directories match, we must check if the whole path matches.
-	for i := len(g.rules)-1; i >= 0; i-- {
+	for i := len(g.rules) - 1; i >= 0; i-- {
 		rule := g.rules[i]
 
 		if rule.matchesPath(isDir, pathComponents) {

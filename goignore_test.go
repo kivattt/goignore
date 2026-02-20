@@ -215,6 +215,47 @@ func TestCompileIgnoreLines_CarriageReturn(t *testing.T) {
 	assert.Equal(t, false, ignoreObject.MatchesPath("bd"), "bd should not match")
 }
 
+func TestCompileIgnoreLines_Trimming(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"hello\r\n",
+		"hi \r\n",
+		"hi\r\n ", // Will only trim the trailing spaces...
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, true, ignoreObject.MatchesPath("hello"), "hello should match")
+	assert.Equal(t, true, ignoreObject.MatchesPath("hi"), "hi should match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("hi "), "\"hi \" should not match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("hello\r\n"), "\"hello\r\n\" should not match")
+
+	assert.Equal(t, true, ignoreObject.MatchesPath("hi\r\n"), "\"hi\r\n\" should match")
+}
+
+func TestTrimUnescapedTrailingSpaces(t *testing.T) {
+	type TestCase struct {
+		input    string
+		expected string
+	}
+
+	tests := []TestCase{
+		{"", ""},
+		{"\\", "\\"},
+		{" ", ""},
+		{"  ", ""},
+		{"\\ ", "\\ "},
+		{"\\  ", "\\ "},
+		{"\\   ", "\\ "},
+		{"hello  ", "hello"},
+		{"hello \\  ", "hello \\ "},
+	}
+
+	for _, test := range tests {
+		result := trimUnescapedTrailingSpaces(test.input)
+		assert.Equal(t, test.expected, result)
+	}
+}
+
 func TestCompileIgnoreLines_WindowsPath(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		return
@@ -490,7 +531,6 @@ func FuzzCorrectness(f *testing.F) {
 			}
 			return "false"
 		}
-		fmt.Println("checkignore result:", bool2Str(expected))
 
 		ignoreObject := CompileIgnoreLines(line1, line2, line3)
 		result := ignoreObject.MatchesPath(path)
