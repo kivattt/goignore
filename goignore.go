@@ -499,14 +499,12 @@ func validPathBadUtf8Allowed(name string) bool {
 }
 
 func removeFromFirstNullByte(s string) string {
-	var i int
-	for i = 0; i < len(s); i++ {
-		if s[i] == '\x00' {
-			break
-		}
+	firstNullByte := strings.IndexByte(s, '\x00')
+	if firstNullByte == -1 {
+		return s
 	}
 
-	return s[:i]
+	return s[:firstNullByte]
 }
 
 // Tries to match the path to all the rules in the gitignore
