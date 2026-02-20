@@ -2,7 +2,6 @@ package goignore
 
 import (
 	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -469,6 +468,35 @@ func createRule(pattern string) rule {
 	}
 }
 
+// Copied from: https://cs.opensource.google/go/go/+/refs/tags/go1.26.0:src/io/fs/fs.go;l=64
+// Modified to allow invalid UTF-8
+func validPathBadUtf8Allowed(name string) bool {
+	/*if !utf8.ValidString(name) {
+		return false
+	}*/
+
+	if name == "." {
+		// special case
+		return true
+	}
+
+	// Iterate over elements in name, checking each.
+	for {
+		i := 0
+		for i < len(name) && name[i] != '/' {
+			i++
+		}
+		elem := name[:i]
+		if elem == "" || elem == "." || elem == ".." {
+			return false
+		}
+		if i == len(name) {
+			return true // reached clean ending
+		}
+		name = name[i+1:]
+	}
+}
+
 // Tries to match the path to all the rules in the gitignore
 func (g *GitIgnore) MatchesPath(path string) bool {
 	// TODO: check if path actually points to a directory on the filesystem
@@ -479,7 +507,7 @@ func (g *GitIgnore) MatchesPath(path string) bool {
 		path = "/"
 		isDir = true
 	}
-	if !fs.ValidPath(path) {
+	if !validPathBadUtf8Allowed(path) {
 		return false
 	}
 	pathComponents := mySplit(path, '/')

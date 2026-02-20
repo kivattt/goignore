@@ -269,7 +269,7 @@ func TestCompileIgnoreLines_WindowsPath(t *testing.T) {
 	assert.Equal(t, true, ignoreObject.MatchesPath("a\\b\\c\\d"), "a\\b\\c\\d should match")
 }
 
-func TestWeirdAsciiCharacter(t *testing.T) {
+func TestWeirdByte(t *testing.T) {
 	ignoreObject := CompileIgnoreLines(
 		"folder",
 	)
