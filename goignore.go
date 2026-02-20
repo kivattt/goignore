@@ -404,6 +404,7 @@ func CompileIgnoreLines(patterns ...string) *GitIgnore {
 
 	for _, pattern := range patterns {
 		// skip empty lines, comments, '!', '/', and trailing spaces which aren't escaped with a backslash like "\ ".
+		pattern = removeFromFirstNullByte(pattern) // Remove anything after and including the first null-byte
 		pattern = strings.TrimRight(pattern, "\r\n")
 		pattern = trimUnescapedTrailingSpaces(pattern)
 		if pattern == "" || pattern == "!" || pattern == "/" || pattern[0] == '#' {
@@ -497,8 +498,21 @@ func validPathBadUtf8Allowed(name string) bool {
 	}
 }
 
+func removeFromFirstNullByte(s string) string {
+	var i int
+	for i = 0; i < len(s); i++ {
+		if s[i] == '\x00' {
+			break
+		}
+	}
+
+	return s[:i]
+}
+
 // Tries to match the path to all the rules in the gitignore
 func (g *GitIgnore) MatchesPath(path string) bool {
+	//path = removeFromFirstNullByte(path)
+
 	// TODO: check if path actually points to a directory on the filesystem
 	isDir := strings.HasSuffix(path, "/")
 	path = filepath.Clean(path)

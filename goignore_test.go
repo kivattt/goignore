@@ -256,6 +256,29 @@ func TestTrimUnescapedTrailingSpaces(t *testing.T) {
 	}
 }
 
+func TestRemoveFromFirstNullByte(t *testing.T) {
+	type TestCase struct {
+		input    string
+		expected string
+	}
+
+	tests := []TestCase{
+		{"", ""},
+		{"\x00", ""},
+		{"\x00\x00", ""},
+		{"hello", "hello"},
+		{"hel\x00lo", "hel"},
+		{"hel\x00lo", "hel"},
+		{"hello\x00", "hello"},
+		{"hello\x00\x00", "hello"},
+	}
+
+	for _, test := range tests {
+		result := removeFromFirstNullByte(test.input)
+		assert.Equal(t, test.expected, result)
+	}
+}
+
 func TestCompileIgnoreLines_WindowsPath(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		return
