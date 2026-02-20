@@ -269,6 +269,16 @@ func TestCompileIgnoreLines_WindowsPath(t *testing.T) {
 	assert.Equal(t, true, ignoreObject.MatchesPath("a\\b\\c\\d"), "a\\b\\c\\d should match")
 }
 
+func TestWeirdAsciiCharacter(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"folder",
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, true, ignoreObject.MatchesPath("folder/\xd1"), "\"folder/\\xd1\" should match")
+}
+
 func TestWildCardFiles(t *testing.T) {
 	gitIgnore := []string{"*.swp", "/foo/*.wat", "bar/*.txt"}
 	ignoreObject := CompileIgnoreLines(gitIgnore...)
