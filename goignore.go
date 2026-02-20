@@ -371,7 +371,6 @@ func (r *rule) matchesPath(isDirectory bool, pathComponents []string) bool {
 }
 
 // Stores a list of rules for matching paths against .gitignore patterns
-// PathComponentsBuf is a temporary buffer for mySplit calls, this avoids excessive allocation
 type GitIgnore struct {
 	rules []rule
 }
@@ -384,7 +383,7 @@ func trimUnescapedTrailingSpaces(s string) string {
 		}
 	}
 
-	// Required to prevent indexing at -1
+	// Required to prevent indexing into index -1
 	if i < 0 {
 		return ""
 	}
@@ -451,8 +450,6 @@ func createRule(pattern string) rule {
 	}
 
 	// split the pattern into components
-	// we use the default split function because this only runs once for each rule
-	// this saves memory compared to using mySplit
 	components := mySplit(pattern, '/')
 
 	ruleComponents := make([]ruleComponent, len(components))
