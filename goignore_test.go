@@ -325,6 +325,18 @@ func TestValidReinclude(t *testing.T) {
 	assert.Equal(t, false, ignoreObject.MatchesPath("folder/file.txt"), "folder/file.txt should not match")
 }
 
+func TestInvalidReinclude(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"folder",
+		"!folder/subfolder",
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, false, ignoreObject.MatchesPath("file.txt"), "file.txt should not match")
+	assert.Equal(t, true, ignoreObject.MatchesPath("folder/subfolder/file.txt"), "folder/subfolder/file.txt should match")
+}
+
 func TestWildCardFiles(t *testing.T) {
 	gitIgnore := []string{"*.swp", "/foo/*.wat", "bar/*.txt"}
 	ignoreObject := CompileIgnoreLines(gitIgnore...)
