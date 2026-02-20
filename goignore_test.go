@@ -313,6 +313,18 @@ func TestSingleSlashRule(t *testing.T) {
 	assert.Equal(t, false, ignoreObject.MatchesPath("/"), "/ should not match")
 }
 
+func TestValidReinclude(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"folder",
+		"!folder",
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, false, ignoreObject.MatchesPath("file.txt"), "file.txt should not match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("folder/file.txt"), "folder/file.txt should not match")
+}
+
 func TestWildCardFiles(t *testing.T) {
 	gitIgnore := []string{"*.swp", "/foo/*.wat", "bar/*.txt"}
 	ignoreObject := CompileIgnoreLines(gitIgnore...)
