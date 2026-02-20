@@ -219,7 +219,7 @@ func TestCompileIgnoreLines_Trimming(t *testing.T) {
 	ignoreObject := CompileIgnoreLines(
 		"hello\r\n",
 		"hi \r\n",
-		"hi\r\n ", // Will only trim the trailing spaces...
+		"hi\r\n ", // Will only trim the trailing spaces, not the \r\n.
 	)
 
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
