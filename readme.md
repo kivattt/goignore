@@ -35,7 +35,7 @@ func main() {
 }
 ```
 
-For more examples, refer to the [goignore_test.go](goignore_test.go) file.
+For more examples, refer to the [goignore\_test.go](goignore_test.go) file.
 
 ## Tests
 
@@ -43,15 +43,19 @@ Some of this package's tests were copied from the [go-gitignore](https://github.
 
 ## Fuzzing
 
-I have fuzzed the library for about 2 hours in total, and the fuzzer did not find any crashes in that time.
-Currently fuzzing does not check if the library's output is correct.
+Fuzz for bugs in the library, it uses [git-check-ignore](https://git-scm.com/docs/git-check-ignore) to see if we match its expectations.
+```shell
+go test -fuzz FuzzCorrectness
+```
 
-If you want to, you can do fuzzing using these commands:
+Fuzz for crashes in `makeRuleComponent()` and `matchComponent()`
 ```shell
 go test -fuzz FuzzMatchComponent
 ```
-or
+
+Fuzz for crashes in `CompileIgnoreLines()` and `MatchesPath()`
 ```shell
 go test -fuzz FuzzWhole
 ```
+
 These are implemented at the bottom of the [tests file](goignore_test.go).
