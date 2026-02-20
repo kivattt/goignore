@@ -39,6 +39,8 @@ For more examples, refer to the [goignore\_test.go](goignore_test.go) file.
 
 ## Tests
 
+If you're not on Windows, you can still run the tests through wine with `run_windows_test.sh` e.g. on Linux.
+
 Some of this package's tests were copied from the [go-gitignore](https://github.com/sabhiram/go-gitignore) package, and were modified, corrected or extended where needed.
 
 ## Fuzzing
