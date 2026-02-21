@@ -513,7 +513,7 @@ func (g *GitIgnore) MatchesPath(path string) bool {
 
 	// TODO: check if path actually points to a directory on the filesystem
 	isDir := strings.HasSuffix(path, "/")
-	path = filepath.Clean(path)
+	path = filepath.Clean(path) // Removes trailing slashes
 	path = filepath.ToSlash(path)
 	if path == "." {
 		path = "/"
