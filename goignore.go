@@ -509,7 +509,9 @@ func beforeFirstNullByte(s string) string {
 
 // Tries to match the path to all the rules in the gitignore
 func (g *GitIgnore) MatchesPath(path string) bool {
-	path = beforeFirstNullByte(path)
+	if strings.IndexByte(path, '\x00') != -1 {
+		return false
+	}
 
 	// TODO: check if path actually points to a directory on the filesystem
 	isDir := strings.HasSuffix(path, "/")
