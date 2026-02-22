@@ -256,7 +256,7 @@ func TestTrimUnescapedTrailingSpaces(t *testing.T) {
 	}
 }
 
-func TestRemoveFromFirstNullByte(t *testing.T) {
+func TestBeforeFirstNullByte(t *testing.T) {
 	type TestCase struct {
 		input    string
 		expected string
@@ -274,7 +274,7 @@ func TestRemoveFromFirstNullByte(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := removeFromFirstNullByte(test.input)
+		result := beforeFirstNullByte(test.input)
 		assert.Equal(t, test.expected, result)
 	}
 }
@@ -300,6 +300,29 @@ func TestWeirdByte(t *testing.T) {
 	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
 
 	assert.Equal(t, true, ignoreObject.MatchesPath("folder/\xd1"), "\"folder/\\xd1\" should match")
+}
+
+func TestNullBytePattern(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"before\x00after",
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, true, ignoreObject.MatchesPath("before"), "before should match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("beforeafter"), "beforeafter should not match")
+}
+
+func TestNullByteInput(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"ignored",
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, true, ignoreObject.MatchesPath("ignored"), "ignored should match")
+	assert.Equal(t, true, ignoreObject.MatchesPath("ignored\x00after"), "\"ignored\\x00after\" should match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("\x00ignored"), "\"\\x00ignored\" should not match")
 }
 
 func TestSingleSlashRule(t *testing.T) {
