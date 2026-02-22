@@ -325,6 +325,18 @@ func TestNullByteInput(t *testing.T) {
 	assert.Equal(t, false, ignoreObject.MatchesPath("\x00ignored"), "\"\\x00ignored\" should not match")
 }
 
+// Should not happen when using CompileIgnoreFile, but we should handle it correctly for CompileIgnoreLines
+func TestNewlinePattern(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"\nfile",
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, true, ignoreObject.MatchesPath("file"), "file should match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("\nfile"), "\"\\nfile\" should not match")
+}
+
 func TestSingleSlashRule(t *testing.T) {
 	ignoreObject := CompileIgnoreLines(
 		"/",
