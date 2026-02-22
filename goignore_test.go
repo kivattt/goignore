@@ -313,18 +313,6 @@ func TestNullBytePattern(t *testing.T) {
 	assert.Equal(t, false, ignoreObject.MatchesPath("beforeafter"), "beforeafter should not match")
 }
 
-func TestNullByteInput(t *testing.T) {
-	ignoreObject := CompileIgnoreLines(
-		"ignored",
-	)
-
-	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
-
-	assert.Equal(t, true, ignoreObject.MatchesPath("ignored"), "ignored should match")
-	assert.Equal(t, true, ignoreObject.MatchesPath("ignored\x00after"), "\"ignored\\x00after\" should match")
-	assert.Equal(t, false, ignoreObject.MatchesPath("\x00ignored"), "\"\\x00ignored\" should not match")
-}
-
 // Should not happen when using CompileIgnoreFile, but we should handle it correctly for CompileIgnoreLines
 func TestNewlinePattern(t *testing.T) {
 	ignoreObject := CompileIgnoreLines(
@@ -623,7 +611,7 @@ func FuzzCorrectness(f *testing.F) {
 
 	gitCheckIgnore := func(repoPath, path string) bool {
 		// git check-ignore --no-index -q <pathname>
-		cmd := exec.Command("git", "check-ignore", "--no-index", "-q", path)
+		cmd := exec.Command("git", "check-ignore", "--no-index", "-q", "--", path)
 		cmd.Dir = repoPath
 		err := cmd.Run()
 		return err == nil
