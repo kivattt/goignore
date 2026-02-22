@@ -313,18 +313,6 @@ func TestNullBytePattern(t *testing.T) {
 	assert.Equal(t, false, ignoreObject.MatchesPath("beforeafter"), "beforeafter should not match")
 }
 
-// Should not happen when using CompileIgnoreFile, but we should handle it correctly for CompileIgnoreLines
-func TestNewlinePattern(t *testing.T) {
-	ignoreObject := CompileIgnoreLines(
-		"\nfile",
-	)
-
-	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
-
-	assert.Equal(t, true, ignoreObject.MatchesPath("file"), "file should match")
-	assert.Equal(t, false, ignoreObject.MatchesPath("\nfile"), "\"\\nfile\" should not match")
-}
-
 func TestSingleSlashRule(t *testing.T) {
 	ignoreObject := CompileIgnoreLines(
 		"/",
@@ -583,16 +571,14 @@ func FuzzCorrectness(f *testing.F) {
 	// And a .gitignore file containing the 3 lines line1, line2 and line3.
 	//
 	// Returns the name of the folder it created.
-	prepareRandomlyNamedRepoWithGitIgnore := func(line1, line2, line3 string) (string, error) {
+	prepareRandomlyNamedRepoWithGitIgnore := func(gitIgnoreContent string) (string, error) {
 		randomName, err := os.MkdirTemp(".", "*-goignore-fuzz")
 		if err != nil {
 			return randomName, err
 		}
 
-		concat := []byte(line1 + "\n" + line2 + "\n" + line3 + "\n")
-
 		// Write the .gitignore
-		os.WriteFile(filepath.Join(randomName, ".gitignore"), concat, 0644)
+		os.WriteFile(filepath.Join(randomName, ".gitignore"), []byte(gitIgnoreContent), 0644)
 
 		// "git init" the repo
 		cmd := exec.Command("git", "init")
@@ -617,12 +603,12 @@ func FuzzCorrectness(f *testing.F) {
 		return err == nil
 	}
 
-	f.Fuzz(func(t *testing.T, line1, line2, line3 string, path string) {
+	f.Fuzz(func(t *testing.T, gitIgnoreContent, path string) {
 		if path == "." {
 			return
 		}
 
-		repoPath, err := prepareRandomlyNamedRepoWithGitIgnore(line1, line2, line3)
+		repoPath, err := prepareRandomlyNamedRepoWithGitIgnore(gitIgnoreContent)
 		if err != nil {
 			t.Fail()
 		}
@@ -636,15 +622,14 @@ func FuzzCorrectness(f *testing.F) {
 			return "false"
 		}
 
-		ignoreObject := CompileIgnoreLines(line1, line2, line3)
+		// Split in the same way that CompileIgnoreFile does
+		ignoreObject := CompileIgnoreLines(strings.Split(gitIgnoreContent, "\n")...)
 		result := ignoreObject.MatchesPath(path)
 
 		if result != expected {
 			t.Log("For path:", path)
-			t.Log("For .gitignore containing these 3 lines:")
-			t.Log("Line #1:", line1)
-			t.Log("Line #2:", line2)
-			t.Log("Line #3:", line3)
+			t.Log("For .gitignore containing:")
+			t.Log(gitIgnoreContent)
 
 			t.Log("Expected " + bool2Str(expected) + ", but got: " + bool2Str(result))
 			t.Fail()

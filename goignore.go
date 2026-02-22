@@ -405,7 +405,7 @@ func CompileIgnoreLines(patterns ...string) *GitIgnore {
 	for _, pattern := range patterns {
 		// skip empty lines, comments, '!', '/', and trailing spaces which aren't escaped with a backslash like "\ ".
 		pattern = beforeFirstNullByte(pattern) // Remove anything after and including the first null-byte
-		pattern = strings.Trim(pattern, "\r\n")
+		pattern = strings.TrimRight(pattern, "\r\n")
 		pattern = trimUnescapedTrailingSpaces(pattern)
 		if pattern == "" || pattern == "!" || pattern == "/" || pattern[0] == '#' {
 			continue
