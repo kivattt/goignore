@@ -2,6 +2,7 @@ package goignore
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,6 +65,7 @@ type ruleComponent struct {
 // Relative is true if the rule is relative (i.e. starts with '/')
 type rule struct {
 	Components    []ruleComponent
+	Special       bool
 	Negate        bool
 	OnlyDirectory bool
 	Relative      bool
@@ -352,6 +354,12 @@ func matchAllComponents(path []string, components []ruleComponent) (matches bool
 // Tries to match the path against the rule
 // the function expects a buffer of sufficient size to get passed to it, this avoids excessive memory allocation
 func (r *rule) matchesPath(isDirectory bool, pathComponents []string) bool {
+	//fmt.Println("matchesPath() NON-SPECIAL FOR:", pathComponents, "isdir?", isDirectory)
+	if r.Special {
+		//fmt.Println("matchesPath() SPECIAL FOR:", pathComponents, "isdir?", isDirectory)
+		return isDirectory
+	}
+
 	if !r.Relative {
 		// stinky recursive step
 		for j := 0; j < len(pathComponents); j++ {
@@ -364,6 +372,9 @@ func (r *rule) matchesPath(isDirectory bool, pathComponents []string) bool {
 		return false
 	}
 
+	if len(r.Components) == 0 {
+		return false
+	}
 	match, final := matchAllComponents(pathComponents, r.Components)
 
 	return match && (!final || !r.OnlyDirectory || isDirectory)
@@ -404,13 +415,21 @@ func CompileIgnoreLines(patterns ...string) *GitIgnore {
 
 	for _, pattern := range patterns {
 		// skip empty lines, comments, '!', '/', and trailing spaces which aren't escaped with a backslash like "\ ".
-		pattern = beforeFirstNullByte(pattern) // Remove anything after and including the first null-byte
 		pattern = strings.TrimRight(pattern, "\r\n")
-		pattern = trimUnescapedTrailingSpaces(pattern)
-		if pattern == "" || pattern == "!" || pattern == "/" || pattern[0] == '#' {
+		//if pattern == "" || pattern == "!" || pattern == "/" || pattern[0] == '#' {
+		if pattern == "" || pattern == "!" || pattern[0] == '#' {
 			continue
 		}
 
+		pattern = beforeFirstNullByte(pattern) // Remove anything after and including the first null-byte
+		pattern = trimUnescapedTrailingSpaces(pattern)
+
+		// Rules with "//" in them are invalid.
+		if i := strings.IndexByte(pattern, '/'); i != -1 {
+			if len(pattern) >= i+2 && pattern[i:i+2] == "//" {
+				continue
+			}
+		}
 		rule := createRule(pattern)
 
 		gitignore.rules = append(gitignore.rules, rule)
@@ -431,15 +450,26 @@ func CompileIgnoreFile(filename string) (*GitIgnore, error) {
 
 // create a rule from a pattern
 func createRule(pattern string) rule {
+	if pattern == "" {
+		return rule{
+			Special:       true,
+			Components:    nil,
+			Negate:        false,
+			//OnlyDirectory: false,
+			OnlyDirectory: true,
+			Relative:      false,
+		}
+	}
+
 	negate := false
 	onlyDirectory := false
 	relative := false
-	if pattern[0] == '!' {
+	if len(pattern) > 0 && pattern[0] == '!' {
 		negate = true
 		pattern = pattern[1:] // skip the '!'
 	}
 
-	if pattern[0] == '/' {
+	if len(pattern) > 0 && pattern[0] == '/' {
 		relative = true
 		pattern = pattern[1:] // skip the '/'
 	}
@@ -509,6 +539,15 @@ func beforeFirstNullByte(s string) string {
 
 // Tries to match the path to all the rules in the gitignore
 func (g *GitIgnore) MatchesPath(path string) bool {
+	cool := false
+	if path == "0/." {
+		cool = true
+	}
+
+	if path == "" {
+		return false
+	}
+
 	if strings.IndexByte(path, '\x00') != -1 {
 		return false
 	}
@@ -517,20 +556,25 @@ func (g *GitIgnore) MatchesPath(path string) bool {
 	isDir := strings.HasSuffix(path, "/")
 	path = filepath.Clean(path) // Removes trailing slashes, except for roots like "/", "C:\"
 	path = filepath.ToSlash(path)
+	if !validPathBadUtf8Allowed(path) {
+		return false
+	}
 	if path == "." {
 		path = "/"
 		isDir = true
 	}
-	if !validPathBadUtf8Allowed(path) {
-		return false
-	}
 	pathComponents := mySplit(path, '/')
+
+	if cool {
+		fmt.Println("COOL, split for path:", path, pathComponents)
+	}
 
 	// First, if there are any parent directories (more than 1 path component), check if they match.
 	for j := 0; j < len(pathComponents)-1; j++ {
 		for i := len(g.rules) - 1; i >= 0; i-- {
 			rule := g.rules[i]
-			if rule.matchesPath(true /* Makes no difference? */, pathComponents[:j+1]) {
+			//if rule.matchesPath(true /* Makes no difference? */, pathComponents[:j+1]) {
+			if rule.matchesPath(false /* Makes no difference? */, pathComponents[:j+1]) {
 				if rule.Negate {
 					break // Undecided.
 				} else {
@@ -538,6 +582,9 @@ func (g *GitIgnore) MatchesPath(path string) bool {
 				}
 			}
 		}
+	}
+	if cool {
+		fmt.Println("COOL, AAA")
 	}
 
 	// If no parent directories match, we must check if the whole path matches.
@@ -551,6 +598,10 @@ func (g *GitIgnore) MatchesPath(path string) bool {
 				return true
 			}
 		}
+	}
+
+	if cool {
+		fmt.Println("COOL, BBB")
 	}
 
 	return false

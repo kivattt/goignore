@@ -348,7 +348,7 @@ func TestInvalidReinclude(t *testing.T) {
 	assert.Equal(t, true, ignoreObject.MatchesPath("folder/subfolder/file.txt"), "folder/subfolder/file.txt should match")
 }
 
-/*func TestSpacesMatchEmptyBasename(t *testing.T) {
+func TestSpacesMatchEmptyBasename(t *testing.T) {
 	ignoreObject := CompileIgnoreLines(
 		" ",
 	)
@@ -359,7 +359,7 @@ func TestInvalidReinclude(t *testing.T) {
 	assert.Equal(t, true, ignoreObject.MatchesPath("."), ". should match")
 	//assert.Equal(t, true, ignoreObject.MatchesPath(""), "\"\" should match") // Unsure if this should be true.
 	assert.Equal(t, false, ignoreObject.MatchesPath("file"), "file should not match")
-}*/
+}
 
 func TestWildCardFiles(t *testing.T) {
 	gitIgnore := []string{"*.swp", "/foo/*.wat", "bar/*.txt"}
@@ -533,6 +533,9 @@ func TestMySplit(t *testing.T) {
 		{"dontsplit", ' ', []string{"dontsplit"}},
 		{"", ' ', []string{}},
 		{"aaaaa", 'a', []string{}},
+		{"/", '/', []string{}},
+		{"//", '/', []string{}},
+		{"0//", '/', []string{"0"}},
 	}
 
 	for _, test := range tests {
