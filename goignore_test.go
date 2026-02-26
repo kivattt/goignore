@@ -595,7 +595,6 @@ func FuzzCorrectness(f *testing.F) {
 			t.Fail()
 		}
 
-		// We could pass multiple paths to git check-ignore to improve performance?
 		expected := gitCheckIgnore(repoPath, path)
 		bool2Str := func(b bool) string {
 			if b {
