@@ -590,10 +590,6 @@ func FuzzCorrectness(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, gitIgnoreContent, path string) {
-		if path == "." {
-			return
-		}
-
 		repoPath, err := prepareRandomlyNamedRepoWithGitIgnore(gitIgnoreContent)
 		if err != nil {
 			t.Fail()
