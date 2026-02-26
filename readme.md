@@ -45,7 +45,7 @@ Some of this package's tests were copied from the [go-gitignore](https://github.
 
 ## Fuzzing
 
-Fuzz for bugs in the library, it uses [git-check-ignore](https://git-scm.com/docs/git-check-ignore) to see if we match its expectations.
+Fuzz for bugs in the library, it uses [git-check-ignore](https://git-scm.com/docs/git-check-ignore) to see where we have different output.
 ```shell
 go test -fuzz FuzzCorrectness
 ```
