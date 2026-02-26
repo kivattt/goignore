@@ -583,7 +583,6 @@ func FuzzCorrectness(f *testing.F) {
 	}
 
 	gitCheckIgnore := func(repoPath, path string) bool {
-		// git check-ignore --no-index -q <pathname>
 		cmd := exec.Command("git", "check-ignore", "--no-index", "-q", "--", path)
 		cmd.Dir = repoPath
 		err := cmd.Run()
