@@ -555,7 +555,7 @@ func FuzzWhole(f *testing.F) {
 
 func FuzzCorrectness(f *testing.F) {
 	// Creates a randomly named folder with a valid repository
-	// And a .gitignore file containing the 3 lines line1, line2 and line3.
+	// And a .gitignore file containing the gitIgnoreContent
 	//
 	// Returns the name of the folder it created.
 	prepareRandomlyNamedRepoWithGitIgnore := func(gitIgnoreContent string) (string, error) {
