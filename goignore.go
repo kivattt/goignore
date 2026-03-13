@@ -2,7 +2,6 @@ package goignore
 
 import (
 	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -358,7 +357,7 @@ func (r *rule) matchesPath(isDirectory bool, pathComponents []string) bool {
 		for j := 0; j < len(pathComponents); j++ {
 			match, final := matchAllComponents(pathComponents[j:], r.Components)
 			if match {
-				return !r.OnlyDirectory || r.OnlyDirectory && (!final || final && isDirectory)
+				return !final || !r.OnlyDirectory || isDirectory
 			}
 		}
 
@@ -367,13 +366,34 @@ func (r *rule) matchesPath(isDirectory bool, pathComponents []string) bool {
 
 	match, final := matchAllComponents(pathComponents, r.Components)
 
-	return match && (!r.OnlyDirectory || r.OnlyDirectory && (!final || final && isDirectory))
+	return match && (!final || !r.OnlyDirectory || isDirectory)
 }
 
 // Stores a list of rules for matching paths against .gitignore patterns
-// PathComponentsBuf is a temporary buffer for mySplit calls, this avoids excessive allocation
 type GitIgnore struct {
 	rules []rule
+}
+
+func trimUnescapedTrailingSpaces(s string) string {
+	var i int
+	for i = len(s) - 1; i >= 0; i-- {
+		if s[i] != ' ' {
+			break
+		}
+	}
+
+	// Required to prevent indexing into index -1
+	if i < 0 {
+		return ""
+	}
+
+	if s[i] == '\\' {
+		if i < len(s)-1 {
+			i++
+		}
+	}
+
+	return s[:i+1]
 }
 
 // Creates a Gitignore from a list of patterns (lines in a .gitignore file)
@@ -383,9 +403,11 @@ func CompileIgnoreLines(patterns ...string) *GitIgnore {
 	}
 
 	for _, pattern := range patterns {
-		// skip empty lines, comments, and trailing/leading whitespace
-		pattern = strings.Trim(pattern, " \t\r\n")
-		if pattern == "" || pattern == "!" || pattern[0] == '#' {
+		// skip empty lines, comments, '!', '/', and trailing spaces which aren't escaped with a backslash like "\ ".
+		pattern = beforeFirstNullByte(pattern) // Remove anything after and including the first null-byte
+		pattern = strings.TrimRight(pattern, "\r\n")
+		pattern = trimUnescapedTrailingSpaces(pattern)
+		if pattern == "" || pattern == "!" || pattern == "/" || pattern[0] == '#' {
 			continue
 		}
 
@@ -428,8 +450,6 @@ func createRule(pattern string) rule {
 	}
 
 	// split the pattern into components
-	// we use the default split function because this only runs once for each rule
-	// this saves memory compared to using mySplit
 	components := mySplit(pattern, '/')
 
 	ruleComponents := make([]ruleComponent, len(components))
@@ -449,30 +469,89 @@ func createRule(pattern string) rule {
 	}
 }
 
+// Copied from: https://cs.opensource.google/go/go/+/refs/tags/go1.26.0:src/io/fs/fs.go;l=64
+// Modified to allow invalid UTF-8
+func validPathBadUtf8Allowed(name string) bool {
+	/*if !utf8.ValidString(name) {
+		return false
+	}*/
+
+	if name == "." {
+		// special case
+		return true
+	}
+
+	// Iterate over elements in name, checking each.
+	for {
+		i := 0
+		for i < len(name) && name[i] != '/' {
+			i++
+		}
+		elem := name[:i]
+		if elem == "" || elem == "." || elem == ".." {
+			return false
+		}
+		if i == len(name) {
+			return true // reached clean ending
+		}
+		name = name[i+1:]
+	}
+}
+
+func beforeFirstNullByte(s string) string {
+	firstNullByte := strings.IndexByte(s, '\x00')
+	if firstNullByte == -1 {
+		return s
+	}
+
+	return s[:firstNullByte]
+}
+
 // Tries to match the path to all the rules in the gitignore
 func (g *GitIgnore) MatchesPath(path string) bool {
+	if strings.IndexByte(path, '\x00') != -1 {
+		return false
+	}
+
 	// TODO: check if path actually points to a directory on the filesystem
 	isDir := strings.HasSuffix(path, "/")
-	path = filepath.Clean(path)
+	path = filepath.Clean(path) // Removes trailing slashes, except for roots like "/", "C:\"
 	path = filepath.ToSlash(path)
 	if path == "." {
 		path = "/"
 		isDir = true
 	}
-	if !fs.ValidPath(path) {
+	if !validPathBadUtf8Allowed(path) {
 		return false
 	}
 	pathComponents := mySplit(path, '/')
-	matched := false
 
-	for _, rule := range g.rules {
-		if rule.matchesPath(isDir, pathComponents) {
-			if !rule.Negate {
-				matched = true
-			} else {
-				matched = false
+	// First, if there are any parent directories (more than 1 path component), check if they match.
+	for j := 0; j < len(pathComponents)-1; j++ {
+		for i := len(g.rules) - 1; i >= 0; i-- {
+			rule := g.rules[i]
+			if rule.matchesPath(true /* Makes no difference? */, pathComponents[:j+1]) {
+				if rule.Negate {
+					break // Undecided.
+				} else {
+					return true
+				}
 			}
 		}
 	}
-	return matched
+
+	// If no parent directories match, we must check if the whole path matches.
+	for i := len(g.rules) - 1; i >= 0; i-- {
+		rule := g.rules[i]
+
+		if rule.matchesPath(isDir, pathComponents) {
+			if rule.Negate {
+				return false
+			} else {
+				return true
+			}
+		}
+	}
+
+	return false
 }

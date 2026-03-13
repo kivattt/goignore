@@ -2,6 +2,9 @@ package goignore
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -90,6 +93,22 @@ func TestCompileIgnoreLines_HandleIncludePattern(t *testing.T) {
 	assert.Equal(t, true, ignoreObject.MatchesPath("foo/baz"), "foo/baz should match")
 	assert.Equal(t, false, ignoreObject.MatchesPath("foo"), "foo should not match")
 	assert.Equal(t, false, ignoreObject.MatchesPath("/foo/bar"), "/foo/bar should not match")
+}
+
+func TestCompileIgnoreLines_InvalidReIncludeNegatePattern(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"folder",
+		"!folder/subfolder", // Invalid re-include pattern
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, true, ignoreObject.MatchesPath("folder"), "folder should match")
+	assert.Equal(t, true, ignoreObject.MatchesPath("folder/"), "folder/ should match")
+	assert.Equal(t, true, ignoreObject.MatchesPath("folder/subfolder"), "folder/subfolder should match")
+	assert.Equal(t, true, ignoreObject.MatchesPath("folder/subfolder/"), "folder/subfolder/ should match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("foo"), "foo should not match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("foo/"), "foo/ should not match")
 }
 
 // Validate the correct handling of leading / chars
@@ -196,6 +215,70 @@ func TestCompileIgnoreLines_CarriageReturn(t *testing.T) {
 	assert.Equal(t, false, ignoreObject.MatchesPath("bd"), "bd should not match")
 }
 
+func TestCompileIgnoreLines_Trimming(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"hello\r\n",
+		"hi \r\n",
+		"hi\r\n ", // Will only trim the trailing spaces, not the \r\n.
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, true, ignoreObject.MatchesPath("hello"), "hello should match")
+	assert.Equal(t, true, ignoreObject.MatchesPath("hi"), "hi should match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("hi "), "\"hi \" should not match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("hello\r\n"), "\"hello\r\n\" should not match")
+
+	assert.Equal(t, true, ignoreObject.MatchesPath("hi\r\n"), "\"hi\r\n\" should match")
+}
+
+func TestTrimUnescapedTrailingSpaces(t *testing.T) {
+	type TestCase struct {
+		input    string
+		expected string
+	}
+
+	tests := []TestCase{
+		{"", ""},
+		{"\\", "\\"},
+		{" ", ""},
+		{"  ", ""},
+		{"\\ ", "\\ "},
+		{"\\  ", "\\ "},
+		{"\\   ", "\\ "},
+		{"hello  ", "hello"},
+		{"hello \\  ", "hello \\ "},
+	}
+
+	for _, test := range tests {
+		result := trimUnescapedTrailingSpaces(test.input)
+		assert.Equal(t, test.expected, result)
+	}
+}
+
+func TestBeforeFirstNullByte(t *testing.T) {
+	type TestCase struct {
+		input    string
+		expected string
+	}
+
+	tests := []TestCase{
+		{"", ""},
+		{"\x00", ""},
+		{"\x00\x00", ""},
+		{"hello", "hello"},
+		{"hel\x00lo", "hel"},
+		{"hel\x00lo", "hel"},
+		{"hello\x00", "hello"},
+		{"hello\x00\x00", "hello"},
+	}
+
+	for _, test := range tests {
+		result := beforeFirstNullByte(test.input)
+		assert.Equal(t, test.expected, result)
+	}
+}
+
 func TestCompileIgnoreLines_WindowsPath(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		return
@@ -207,6 +290,62 @@ func TestCompileIgnoreLines_WindowsPath(t *testing.T) {
 
 	assert.Equal(t, true, ignoreObject.MatchesPath("abc\\def\\child"), "abc\\def\\child should match")
 	assert.Equal(t, true, ignoreObject.MatchesPath("a\\b\\c\\d"), "a\\b\\c\\d should match")
+}
+
+func TestWeirdByte(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"folder",
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, true, ignoreObject.MatchesPath("folder/\xd1"), "\"folder/\\xd1\" should match")
+}
+
+func TestNullBytePattern(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"before\x00after",
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, true, ignoreObject.MatchesPath("before"), "before should match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("beforeafter"), "beforeafter should not match")
+}
+
+func TestSingleSlashRule(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"/",
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, false, ignoreObject.MatchesPath("file.txt"), "file.txt should not match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("/"), "/ should not match")
+}
+
+func TestValidReinclude(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"folder",
+		"!folder",
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, false, ignoreObject.MatchesPath("file.txt"), "file.txt should not match")
+	assert.Equal(t, false, ignoreObject.MatchesPath("folder/file.txt"), "folder/file.txt should not match")
+}
+
+func TestInvalidReinclude(t *testing.T) {
+	ignoreObject := CompileIgnoreLines(
+		"folder",
+		"!folder/subfolder",
+	)
+
+	assert.NotNil(t, ignoreObject, "Returned object should not be nil")
+
+	assert.Equal(t, false, ignoreObject.MatchesPath("file.txt"), "file.txt should not match")
+	assert.Equal(t, true, ignoreObject.MatchesPath("folder/subfolder/file.txt"), "folder/subfolder/file.txt should match")
 }
 
 func TestWildCardFiles(t *testing.T) {
@@ -411,5 +550,76 @@ func FuzzWhole(f *testing.F) {
 			t.Fail()
 		}
 		ignoreObject.MatchesPath(path)
+	})
+}
+
+func FuzzCorrectness(f *testing.F) {
+	// Creates a randomly named folder with a valid repository
+	// And a .gitignore file containing the gitIgnoreContent
+	//
+	// Returns the name of the folder it created.
+	prepareRandomlyNamedRepoWithGitIgnore := func(gitIgnoreContent string) (string, error) {
+		randomName, err := os.MkdirTemp(".", "*-goignore-fuzz")
+		if err != nil {
+			return randomName, err
+		}
+
+		// Write the .gitignore
+		os.WriteFile(filepath.Join(randomName, ".gitignore"), []byte(gitIgnoreContent), 0644)
+
+		// "git init" the repo
+		cmd := exec.Command("git", "init")
+		cmd.Dir = randomName
+		err = cmd.Run()
+		return randomName, err
+	}
+
+	deleteFolderRecursively := func(path string) error {
+		if !strings.HasSuffix(path, "-goignore-fuzz") {
+			panic("deleteFolderRecursively() was asked to delete a folder not ending in -goignore-fuzz: " + path)
+		}
+
+		return os.RemoveAll(path)
+	}
+
+	gitCheckIgnore := func(repoPath, path string) bool {
+		cmd := exec.Command("git", "check-ignore", "--no-index", "-q", "--", path)
+		cmd.Dir = repoPath
+		err := cmd.Run()
+		return err == nil
+	}
+
+	f.Fuzz(func(t *testing.T, gitIgnoreContent, path string) {
+		repoPath, err := prepareRandomlyNamedRepoWithGitIgnore(gitIgnoreContent)
+		if err != nil {
+			t.Fail()
+		}
+
+		expected := gitCheckIgnore(repoPath, path)
+		bool2Str := func(b bool) string {
+			if b {
+				return "true"
+			}
+			return "false"
+		}
+
+		// Split in the same way that CompileIgnoreFile does
+		ignoreObject := CompileIgnoreLines(strings.Split(gitIgnoreContent, "\n")...)
+		result := ignoreObject.MatchesPath(path)
+
+		if result != expected {
+			t.Log("For path:", path)
+			t.Log("For .gitignore containing:")
+			t.Log(gitIgnoreContent)
+
+			t.Log("Expected " + bool2Str(expected) + ", but got: " + bool2Str(result))
+			t.Fail()
+		}
+
+		err = deleteFolderRecursively(repoPath)
+		if err != nil {
+			fmt.Println("Failed to delete folder:", err)
+			t.Fail()
+		}
 	})
 }
