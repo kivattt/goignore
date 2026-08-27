@@ -526,27 +526,35 @@ func (g *GitIgnore) MatchesPath(path string) bool {
 	}
 	pathComponents := mySplit(path, '/')
 
-	// First, if there are any parent directories (more than 1 path component), check if they match.
-	for j := 0; j < len(pathComponents)-1; j++ {
-		for i := len(g.rules) - 1; i >= 0; i-- {
-			rule := g.rules[i]
-			if rule.matchesPath(true /* Makes no difference? */, pathComponents[:j+1]) {
-				if rule.Negate {
-					break // Undecided.
-				} else {
-					return true
-				}
-			}
-		}
-	}
-
-	// If no parent directories match, we must check if the whole path matches.
+	// Standard matching - check all rules against the full path
 	for i := len(g.rules) - 1; i >= 0; i-- {
 		rule := g.rules[i]
 
 		if rule.matchesPath(isDir, pathComponents) {
 			if rule.Negate {
-				return false
+				// Only now check if any parent directory is excluded
+				// This is lazy evaluation - we only do expensive parent check when needed
+				parentExcluded := false
+				for j := 0; j < len(pathComponents)-1; j++ {
+					for k := len(g.rules) - 1; k >= 0; k-- {
+						parentRule := g.rules[k]
+						if parentRule.matchesPath(true, pathComponents[:j+1]) {
+							if !parentRule.Negate {
+								parentExcluded = true
+							}
+							break
+						}
+					}
+					if parentExcluded {
+						break
+					}
+				}
+				
+				// If parent is excluded, we cannot re-include this path
+				if !parentExcluded {
+					return false
+				}
+				// If parent is excluded, continue to next rule
 			} else {
 				return true
 			}
