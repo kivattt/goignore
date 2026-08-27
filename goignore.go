@@ -526,7 +526,6 @@ func (g *GitIgnore) MatchesPath(path string) bool {
 	}
 	pathComponents := mySplit(path, '/')
 
-	// Standard matching - check all rules against the full path
 	for i := len(g.rules) - 1; i >= 0; i-- {
 		rule := g.rules[i]
 
