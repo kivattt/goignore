@@ -535,6 +535,8 @@ func (g *GitIgnore) MatchesPath(path string) bool {
 				// Only now check if any parent directory is excluded
 				// This is lazy evaluation - we only do expensive parent check when needed
 				parentExcluded := false
+
+			OuterLoop:
 				for j := 0; j < len(pathComponents)-1; j++ {
 					for k := len(g.rules) - 1; k >= 0; k-- {
 						parentRule := g.rules[k]
@@ -542,19 +544,15 @@ func (g *GitIgnore) MatchesPath(path string) bool {
 							if !parentRule.Negate {
 								parentExcluded = true
 							}
-							break
+							break OuterLoop
 						}
 					}
-					if parentExcluded {
-						break
-					}
 				}
-				
+
 				// If parent is excluded, we cannot re-include this path
 				if !parentExcluded {
 					return false
 				}
-				// If parent is excluded, continue to next rule
 			} else {
 				return true
 			}
