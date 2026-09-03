@@ -46,8 +46,15 @@ const (
 
 // Represents a single instruction in a rule component
 type ruleInstruction struct {
-	Type    ruleInstructionType
+	Type ruleInstructionType
+	// Pattern is used for raw string comparisons and for debugging. For charClass
+	// it stores the 32-byte bitset as a string to preserve prior behavior.
 	Pattern string
+	// Precomputed bitset for charClass (avoids indexing into a string on hot path)
+	Bitset [32]byte
+	// Precomputed first byte and length for raw patterns to avoid repeated len()/indexing
+	RawFirst byte
+	RawLen   int
 }
 
 // Represents a single component of a rule (a rule is a series of components separated by '/')
@@ -222,10 +229,13 @@ func makeRuleComponent(component string) (ruleComponent, error) {
 				}
 			}
 
-			instructions = append(instructions, ruleInstruction{
+			ri := ruleInstruction{
 				Type:    charClass,
 				Pattern: string(bitset[:]),
-			})
+			}
+			// copy bitset into instruction for fast access in matchComponent
+			ri.Bitset = bitset
+			instructions = append(instructions, ri)
 			continue
 		}
 
@@ -241,10 +251,16 @@ func makeRuleComponent(component string) (ruleComponent, error) {
 			r++
 		}
 
-		instructions = append(instructions, ruleInstruction{
+		s := patternBuilder.String()
+		ri := ruleInstruction{
 			Type:    raw,
-			Pattern: patternBuilder.String(),
-		})
+			Pattern: s,
+			RawLen:  len(s),
+		}
+		if len(s) > 0 {
+			ri.RawFirst = s[0]
+		}
+		instructions = append(instructions, ri)
 	}
 
 	return ruleComponent{
@@ -279,19 +295,24 @@ func matchComponent(str string, component ruleComponent) bool {
 				return true
 			case charClass:
 				char := str[i]
-				if (instruction.Pattern[char/8] & (1 << (char % 8))) != 0 {
+				if (instruction.Bitset[char/8] & (1 << (char % 8))) != 0 {
 					i++
 					j++
 					continue
 				}
 			case raw:
-				patLen := len(instruction.Pattern)
+				patLen := instruction.RawLen
 				if i+patLen > strLen {
 					break
 				}
-				if str[i] != instruction.Pattern[0] {
+				if patLen == 0 {
+					j++
+					continue
+				}
+				if str[i] != instruction.RawFirst {
 					break
 				}
+				// safe slice compare
 				if str[i:i+patLen] == instruction.Pattern {
 					i += patLen
 					j++
@@ -515,7 +536,7 @@ func (g *GitIgnore) MatchesPath(path string) bool {
 
 	// TODO: check if path actually points to a directory on the filesystem
 	isDir := strings.HasSuffix(path, "/")
-	path = filepath.Clean(path) // Removes trailing slashes, except for roots like "/", "C:\"
+	path = filepath.Clean(path) // Removes trailing slashes, except for roots like "/", "C:\\"
 	path = filepath.ToSlash(path)
 	if path == "." {
 		path = "/"
